@@ -10,7 +10,7 @@ QNX Neutrino IFS.** Firmware: `MST2_EU_VW_ZR_P0369T_3G0919360LN.7z`.
 | Firmware extracted | **Done** | extracted/P0369: 920 files / 1224 folders / 4,025,406,943 B; original preserved |
 | Firmware architecture identified | **Done** | ELF EM_ARM 32-bit; i.MX6 (vpu_fw_imx6q.bin, dev-can-mx6x); QNX (ldqnx, dumpifs, IFS) |
 | Original executable located | **Done** | cpu/cpuimage_sec_stdNavi/33/default/mibstd2_cpu.boot (QNX IFS, 5,513,828 B) |
-| Authentic instructions executed | Pending | IFS entry analysis + QEMU i.MX6 trace attempt next |
+| Authentic instructions executed | Partial (not a boot) | QEMU trace: authentic `bl` executes (LR set); entry/load mapping unresolved → see boot report |
 | Bootloader reached | Pending | |
 | Kernel started | Pending | |
 | Original UI displayed | Pending | |

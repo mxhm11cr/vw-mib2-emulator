@@ -26,6 +26,25 @@ Only authentic VW instruction execution counts, with reproducible trace evidence
 3. Capture: register state, instruction trace, memory/MMIO accesses, exceptions, console.
 4. Record last successfully executed authentic instruction; classify the exact blocker.
 
-## Current blocker
-IFS entry/load address and secure-header layout not yet resolved; QEMU lacks a VW-MIB i.MX6
-board model. No authentic execution claimed yet.
+## Execution attempts (Phase 5 — evidence, honest)
+Tool: `scripts/run-authentic.sh` (QEMU `sabrelite`, Cortex-A9, generic loader, `-d in_asm,cpu,int`).
+Image loaded at the i.MX6 RAM address `0x10800000` (from the IFS header field at file 0x110).
+
+Observed (trace `docs/evidence/p0369-authentic-trace.txt`):
+- Authentic firmware instructions DO execute, e.g. `0x10800190: eb0020c4 bl #0x108084a8`
+  with `R14=0x10800194` correctly set, then conditional ops at the target.
+- However each candidate entry soon takes `Undefined Instruction` (exception 1) and falls
+  through the empty vector table (runaway). The BL targets land in data, not code.
+
+**Conclusion:** authentic instruction execution is demonstrated, but the **true QNX IFS boot
+entry point and load mapping are not yet resolved**, so this is NOT a boot and NOT counted as
+the "authentic instructions executed" boot milestone. The image has a TechniSat secure header
+(magic 0x00542158 = IFS size; file_size − 0x10C) followed by a QNX IFS whose header/entry must
+be parsed with the QNX IFS (`dumpifs`) format rather than guessed.
+
+## Current blocker (precise)
+1. Resolve the QNX IFS header → exact startup entry offset + load address (parse IFS directory;
+   `dumpifs` format). Blind entry guessing is exhausted; need format-correct parsing.
+2. QEMU has no VW-MIB i.MX6 board; full boot needs custom peripherals (UART, GIC/AVIC, timers,
+   eMMC/SDHCI, IPU display) and the QNX boot flow.
+Next: implement a QNX IFS parser to extract startup/procnto offsets and the entry, then re-run.
