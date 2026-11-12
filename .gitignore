@@ -1,4 +1,6 @@
 tools/qemu/
+firmware/analysis/
+firmware/extracted/
 firmware/reference/vmlinuz
 firmware/reference/initrd.gz
 firmware/reference/*.dtb

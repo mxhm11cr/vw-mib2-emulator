@@ -42,14 +42,32 @@ the "authentic instructions executed" boot milestone. The image has a TechniSat 
 (magic 0x00542158 = IFS size; file_size − 0x10C) followed by a QNX IFS whose header/entry must
 be parsed with the QNX IFS (`dumpifs`) format rather than guessed.
 
-## Current blocker (precise)
-1. Resolve the QNX IFS header → exact startup entry (`startup_vaddr`) + load address
-   (`image_paddr`). The firmware's own `dumpifs` confirms these fields exist, but the QNX
-   `IMAGE_SIGNATURE`/`STARTUP_SIGNATURE` constants (QNX `sys/image.h`) are required to locate
-   the header. Empirical isolation (tools/ifs-sig.js cross-referencing dumpifs) is exhausted:
-   the header is NOT in the first 0x400 bytes (TechniSat secure wrapper), and whole-image
-   constant matching only yields coincidental ARM-code overlaps. **Next: obtain the QNX IFS
-   header signature constants / sys/image.h, then parse startup_vaddr format-correctly.**
-2. QEMU has no VW-MIB i.MX6 board; full boot needs custom peripherals (UART, GIC/AVIC, timers,
-   eMMC/SDHCI, IPU display) and the QNX boot flow.
-Blind entry guessing is discontinued (no new evidence); resume only with the header definition.
+## RESOLVED — startup header & entry established reliably (verified)
+Using the documented QNX `sys/startup.h` / `sys/image.h` layouts (user-provided sources) and
+`STARTUP_HDR_SIGNATURE=0x00FF7EEB`, `tools/ifs-parse.js` locates and validates the authentic
+startup header at file offset **0x122**:
+- signature 0x00FF7EEB ✓, version 1 ✓, header_size 256 ✓, **machine 0x28 = 40 (EM_ARM)** ✓
+- **startup_vaddr = 0x10805FB4** (entry), **image_paddr = 0x10800008** (load), paddr_bias 0
+- startup_size 0x1E108, stored_size 0xB0003, imagefs_size 0x40008; imagefs @ file 0x12C10.
+- A second coincidental signature @0x3C1414 is correctly **rejected** (invalid version/machine).
+- Parser tests **3/3 pass** (independently-constructed reference header + validator rejection +
+  authentic firmware entry). The TechniSat wrapper occupies file 0x00–0x121; QNX image starts 0x122.
+
+## Authentic execution (verified, early startup — NOT a full boot)
+`scripts/run-startup.sh` extracts a derived QNX image copy (original preserved), loads it at the
+aligned image_paddr 0x10800008 on QEMU sabrelite (Cortex-A9), transfers to startup_vaddr 0x10805FB4.
+Trace (docs/evidence/p0369-authentic-startup-trace.txt) shows authentic firmware instructions:
+```
+0x10805fb4: e1d421b0  ldrh r2, [r4, #0x10]
+0x10805fb8: e1d431b2  ldrh r3, [r4, #0x12]
+0x10805fbc: fed20133  mrc2 p1, #6, r0, c2, c3, #1   -> Undefined Instruction
+```
+This is genuine authentic VW firmware code executing at the reliably-established entry.
+
+## Current blocker (precise, next)
+1. The startup expects IPL-provided register state (r4 = hardware/info base; here r4=0) and
+   accesses a coprocessor (`mrc2 p1,#6,...`) QEMU's Cortex-A9 does not implement → Undefined.
+   Next: emulate the QNX IPL handoff (set startup registers per QNX ARM boot convention) and
+   the i.MX6/VW-MIB coprocessor/peripheral accesses, or model the specific cp1 register.
+2. QEMU has no VW-MIB i.MX6 board; deeper boot needs UART/GIC/timers/eMMC/IPU modeling.
+No secure-boot/integrity bypass performed; images executed unmodified (derived copy for loading).
