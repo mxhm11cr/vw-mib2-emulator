@@ -66,8 +66,21 @@ This is genuine authentic VW firmware code executing at the reliably-established
 
 ## Current blocker (precise, next)
 1. The startup expects IPL-provided register state (r4 = hardware/info base; here r4=0) and
-   accesses a coprocessor (`mrc2 p1,#6,...`) QEMU's Cortex-A9 does not implement → Undefined.
-   Next: emulate the QNX IPL handoff (set startup registers per QNX ARM boot convention) and
-   the i.MX6/VW-MIB coprocessor/peripheral accesses, or model the specific cp1 register.
+   accesses a coprocessor (`mrc2 p1,#6,r0,c2,c3,#1`) QEMU's Cortex-A9 does not implement →
+   Undefined Instruction at 0x10805fbc. To advance legitimately: model the QNX ARM IPL→startup
+   register handoff and the specific cp1 register (virtual hardware), NOT inject values into
+   the firmware. The exact ARM entry register convention and cp1 meaning are NOT in the QNX
+   IPL/startup docs reviewed, and vocho/openqnx has no hardware/startup source. **Unblock needs:
+   QNX ARM startup assembly source (startup/lib/arm) and/or i.MX6 cp1 register definition.**
 2. QEMU has no VW-MIB i.MX6 board; deeper boot needs UART/GIC/timers/eMMC/IPU modeling.
+
+## Integrity note (honest)
+QNX documented checksum = sum32(image_paddr, startup_size) and sum32(+startup_size,
+stored_size-startup_size). Computed: startup sum32=0x1927e749 (trailer 0xe6ff3073), imagefs
+sum32=0x7859c904 (trailer 0x8000bc10) — neither is zero under simple-sum. The image is a
+TechniSat signed wrapper (`cpuimage_sec`); the original mkifs checksum likely no longer
+applies after re-wrapping. QNX-checksum integrity is therefore NOT claimed as verified.
+The startup_header itself validates fully (signature/version/machine/entry), and authentic
+code executes. stored_size=0xB0003 covers only the first ~720 KiB; the 5.5 MiB file holds
+additional data beyond the QNX image (further structure to map).
 No secure-boot/integrity bypass performed; images executed unmodified (derived copy for loading).
