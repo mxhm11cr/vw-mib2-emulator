@@ -2,46 +2,50 @@
 
 ## 0. Status (honest)
 - **No authentic VW firmware image is present.** Verified by drive scan.
-- A **real, openly-licensed (GPL) reference image** (Debian armhf Linux) has been obtained to
-  validate QEMU CPU/device emulation. This is a **test, NOT a Volkswagen boot** (see boot-progress.md).
-- Authentic VW execution is blocked on obtaining a legitimate MIB2 image (request below).
+- A real, openly-licensed (GPL) **Linux** reference image validates QEMU CPU/device emulation
+  only. It is a **TEST, NOT a Volkswagen boot**, and not even the VW OS (MIB2 runs QNX).
+- Authentic VW execution is blocked on a legitimate MIB2 image (precise request below).
 
-## 1. Target packages
-- **MIB2 Standard** (Delphi/TechniSat/Preh, "MIB STD2 PQ/ZR"): Linux on TI Jacinto 6.
-  Update packages distributed via SD/USB; tooling: olli991/mib-std2-pq-zr-toolbox.
-  Exact container layout to be verified from a real package.
-- **MIB2 High** (Harman MHI2/MHI2Q): QNX. SWDL update via SD card; `metainfo2.txt` manifest;
-  tooling: jilleb/mib2-toolbox, Mr-MIBonk/M.I.B. Exact layout to verify from a real package.
+## 1. MIB2 Standard package format (reported by the TechniSat/Preh toolbox)
+- **Train:** `MST2_<region>_<brand>_<vendor>_<version><suffix>`; suffix T=TechniSat/Preh,
+  D=Delphi, none=Harman (e.g. `MST2_EU_SK_ZR_P0478T`).
+- **Update container:** SWDL software-download package; root contains `metainfo2.txt`
+  (**digitally signed** at end of file — do not edit) and `cpu`/`cpuplus` module folders
+  (modules include `esd_sec`, etc.). Delivered as a zip/SD-card image.
+- **Storage:** ~**7.3 GB eMMC**; a raw eMMC dump is a complete bootable system image
+  (QNX Neutrino 6.5 + apps). The toolbox can dump it ("eMMC content" menu).
+- **OS:** QNX Neutrino 6.5 (ksh, /fs paths, root/root). Boot chain / IFS layout to verify.
+- Tooling: olli991/mib-std2-pq-zr-toolbox (TechniSat/Preh ONLY; not Delphi/Harman).
 
-## 2. Legitimate sources (priority order)
+## 2. MIB2 High package format (Harman, to verify from image)
+- Harman SWDL via SD card; `metainfo2.txt` manifest; QNX. Tooling: jilleb/mib2-toolbox, M.I.B.
+
+## 3. Legitimate sources (priority order)
 1. Official VW service/dealer update package for the exact unit (cleanest provenance).
-2. A legally obtained dump/package from the user's own unit.
+2. A legally obtained raw eMMC dump / update package from the user's own unit.
 3. Community mirror of an unmodified official package — only with recorded provenance + hash.
-   (The MIB-Solution site referenced in M.I.B. issues is MIB2-patch oriented and reported down.)
-4. Official VW **map** updates are public but are map data, not bootable firmware.
-
 We do not use fabricated/modified binaries as proof of authentic execution, and we do not
-defeat secure boot, component protection, or firmware signing.
+defeat secure boot, component protection, or the metainfo2 digital signature.
 
-## 3. Reference image obtained (openly licensed, for emulation validation ONLY)
+## 4. Reference image obtained (openly licensed, CPU/device validation ONLY)
 | File | Source | SHA-256 | License |
 |---|---|---|---|
 | vmlinuz (6,046,208 B) | Debian armhf netboot | b508abca3127cb0d9e1b3aba37f400cbd7dac170040641756807e0e496039de8 | GPL (Linux) |
-| initrd.gz (25,985,449 B) | Debian armhf netboot | e7ca77e9dfd998ef8a6f5a39ae3bf7d8c6cfcbdc3c4f59b84077ace585928fbb | GPL (debian-installer) |
+| initrd.gz (25,985,449 B) | Debian armhf netboot | e7ca77e9dfd998ef8a6f5a39ae3bf7d8c6cfcbdc3c4f59b84077ace585928fbb | GPL |
+| vexpress-v2p-ca15-tc1.dtb (13,104 B) | Debian device-tree | 08ae26a8a5240cfad659a6ff93600873e7fcc91d7efe3b004eba25204ea8db1b | GPL |
 
-URLs: https://deb.debian.org/debian/dists/stable/main/installer-armhf/current/images/netboot/
-These boot on QEMU `vexpress-a15` (Cortex-A15) to validate CPU + PL011 UART + timers + GIC.
-They are **not** VW firmware and produce **no** VW interface.
+Boots on QEMU `vexpress-a15` (Cortex-A15). **Not** VW firmware; produces **no** VW interface;
+the authentic VW OS is QNX, not Linux.
 
-## 4. Inspection tooling (planned, reused from MIB3 core)
-For any authentic image: SHA-256, container/format detection, partition/filesystem listing,
-ELF census + ISA (expect ARMv7-A 32-bit for MIB2), boot-critical components (bootloader/kernel
-vs update-only), and provenance. Read-only; original preserved; COW overlays for experiments.
+## 5. Inspection tooling (implemented + tested)
+`tools/inspect-firmware.js` (read-only): SHA-256, container magic detection (7z/zip/gzip/
+Android boot/sparse/ELF/ISO9660/ext4/metainfo), ELF ISA census (expects ARM 0x28 for MIB2),
+zip central-directory listing, ext4 superblock. Tests: `tests/inspect.test.js` (synthetic
+fixtures, clearly not authentic firmware). Run: `npm test`, `npm run inspect -- <path>`.
 
-## 5. Precise dependency / request to the user
-To attempt authentic MIB2 execution we need ONE of:
-- an original **MIB2 Standard** (TechniSat/Preh/Delphi) update package or eMMC/NAND dump, **or**
-- an original **MIB2 High** (Harman MHI2/MHI2Q) update package or dump,
-with its train/version (e.g. `MHI2_VWG13_…` or `MST2_…`) and how it was obtained.
-Place under `firmware/` (or give a path). Until then, only the openly-licensed reference test
-runs; no authentic VW boot is claimed.
+## 6. Precise dependency / request to the user (MIB2 Standard chosen)
+Provide ONE of, legally obtained and unmodified, under `firmware/` (or give a path):
+- a **MIB2 Standard SWDL update package** (zip/SD image with `metainfo2.txt` + `cpu`/`cpuplus`), **or**
+- a **raw eMMC dump** (~7.3 GB) of a TechniSat/Preh/Delphi MIB2 Standard unit.
+Include: train/version (e.g. `MST2_EU_VW_ZR_P0478T`), supplier suffix (T/D), and how obtained.
+Until then only the openly-licensed reference test runs; no authentic VW boot is claimed.

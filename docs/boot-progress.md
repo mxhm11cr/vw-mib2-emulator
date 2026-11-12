@@ -1,7 +1,8 @@
 # MIB2 Boot Progress Report (separate from MIB3)
 
-Priority target: **MIB2 Standard — TI Jacinto 6, Cortex-A15 (ARMv7-A), Linux.**
-Second target: MIB2 High — Harman MHI2/MHI2Q, QNX.
+Priority target: **MIB2 Standard — TI Jacinto 6, Cortex-A15 (ARMv7-A), QNX Neutrino 6.5.**
+Second target: MIB2 High — Harman MHI2/MHI2Q, QNX. (The GPL Linux reference image validates
+only the emulated CPU/devices; it is not the VW OS and not a VW boot.)
 
 Rule: a generic Linux/QNX boot is **NOT** a VW firmware boot. A custom splash or recreated
 UI is **NOT** a milestone. Only authentic VW code execution counts as VW progress.
