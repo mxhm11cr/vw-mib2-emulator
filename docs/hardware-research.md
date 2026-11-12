@@ -1,5 +1,14 @@
 # MIB2 Hardware Research — VW Golf MK7 (priority target)
 
+> **FIRMWARE-VERIFIED CORRECTION (P0369, 2026-11-12):** The authentic TechniSat MIB2 Standard
+> ZR firmware `MST2_EU_VW_ZR_P0369T` proves the target is **NXP i.MX6 (Cortex-A9, ARMv7-A
+> 32-bit) + QNX Neutrino**, NOT TI Jacinto/Cortex-A15. Evidence: ELF `EM_ARM(40)` 32-bit;
+> `fw/vpu/vpu_fw_imx6q.bin`, `bin/dev-can-mx6x`; boot-image strings `i.MX6`, `ldqnx.so.2`,
+> `valid IFS/`, `QNX6 filesystem`. The TI Jacinto article (SSZTBM2) describes the **Delphi**
+> MIB2 Standard variant — a different hardware platform. QEMU reference: `sabrelite` (i.MX6Q,
+> Cortex-A9). See docs/P0369_FIRMWARE_ANALYSIS.md. The TI Jacinto rows below are retained for
+> the Delphi variant only.
+
 Goal: verified execution of authentic VW infotainment code. MIB2 is prioritized over MIB3
 because it is more openly documented and its CPU core is directly supported by QEMU.
 MIB3 research/code is kept intact in `../vw-mib3-emulator`.
