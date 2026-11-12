@@ -1,0 +1,9 @@
+tools/qemu/
+firmware/reference/vmlinuz
+firmware/reference/initrd.gz
+firmware/reference/*.dtb
+firmware/reference/*.log
+firmware/research/*.pdf
+firmware/research/*.txt
+node_modules/
+*.exe
