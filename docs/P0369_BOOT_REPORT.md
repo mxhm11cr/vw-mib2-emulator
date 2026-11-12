@@ -84,3 +84,30 @@ The startup_header itself validates fully (signature/version/machine/entry), and
 code executes. stored_size=0xB0003 covers only the first ~720 KiB; the 5.5 MiB file holds
 additional data beyond the QNX image (further structure to map).
 No secure-boot/integrity bypass performed; images executed unmodified (derived copy for loading).
+
+## Alignment breakthrough (verified, reproducible — scripts/run-startup.sh)
+Independent verification (per the user's checklist: exact bytes/decoding, CPU mode, entry
+mapping, IPL handoff) — NOT assuming a VW coprocessor:
+- **Correct load base = `0x10800002` (image_paddr − 6).** Empirical scan of load bases
+  0x10800000…0x10800008 shows ONLY 0x10800002 places the canonical QNX ARM `_start` prologue
+  `push {r0-r15}` (0xe92dffff) exactly at `_start = image_paddr + header_size = 0x10800108`.
+  The TechniSat wrapper stores the header at file 0x122; QNX image extracted from there.
+- **Authentic `_start` executes coherently** (QEMU sabrelite, cortex-a9):
+  `0x10800108 push {r0-r15}` → `0x1080010c movt r0,#0x1081` → `0x10800110 bl #0x10808390`.
+  CPU state at entry: `PSR=0x400001d3` (SVC32, ARM state, IRQ/FIQ masked), R00–R14=0.
+  Evidence: docs/evidence/p0369-startup-verified.txt.
+- **The `MRC2 p1,#6,r0,c2,c3,#1` (0xfed20133) is a REAL instruction**, located in the
+  `startup_vaddr` region (file 0x60d6 under shift+2), not data — confirmed by read-only
+  disassembly across alignments. It is reached only via the board entry, after `_start`.
+
+## Refined blocker (precise): NON-UNIFORM image transformation
+The image is **not uniformly aligned**: `_start` (file 0x228) is identity-coherent at load
+0x10800002, but the `bl`-target (file 0x84b0) and `startup_vaddr` (file 0x60d4) regions decode
+only under different byte shifts (shift+2 / halfword-swap). A single load base coheres `_start`
+but the `bl` target then reads as garbage → Undefined Instruction. This is a **section-based
+TechniSat transformation** of the image (consistent with the `…_sec` signed wrapper and the
+boot script's `J5_CPU_REG_CTRL_SECTAP` security tap). 
+**Next genuine step (read-only):** map the per-section transformation (which byte ordering /
+offset applies to each image region) so the whole image loads coherently; then resolve the
+`MRC2 p1` cp1 semantics from the i.MX6/TechniSat startup source before modeling that virtual
+hardware. Do NOT patch/skip instructions or invent coprocessor values.
