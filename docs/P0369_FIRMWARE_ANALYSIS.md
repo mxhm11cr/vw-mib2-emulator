@@ -79,3 +79,27 @@ Parse the QNX IFS header in `mibstd2_cpu.boot` to locate the authentic entry poi
 attempt execution on QEMU i.MX6 (`sabrelite`) / Cortex-A9 with instruction tracing, capturing
 registers/trace/console as evidence. Parsing/loading is NOT execution; a generic Linux/QNX
 boot is NOT a VW boot. See PROGRESS.md and docs/P0369_BOOT_REPORT.md.
+
+## 9. imagefs contents — authentic OS components confirmed (read-only)
+The QNX imagefs (signature `imagefs` @ file 0x12C10; image_size 0x900DF0, dir_offset 0x5C)
+contains the authentic QNX userland. Readable directory entries confirm:
+- **Kernel:** `proc/boot/procnto-smp-instr` (QNX Neutrino SMP microkernel, instrumented).
+- **i.MX6 board drivers:** `devb-sdmmc-mx6q` (SD/MMC), `devc-sermx1` (UART), `sdma-imx6x`,
+  `i2c-mx3`, `ecspi`, `spi-master`, `graphics/iMX6X/csc_gamma.conf`, `devu-ehci-mx28`,
+  `io-usb`, `io-blk`, `fs-qnx6`, `fs-dos`, `fs-cd`, `fs-nfs3`.
+- **OS version:** `6.5.0` (QNX Neutrino 6.5.0).
+- **TechniSat HMI:** `tsd/.../tsd.mib...hmi.anim`, `libtsd.videocapture`, `res-technisat`,
+  `wfd`/`wfdcfg`/`screen` (Windowing Framework Director), `libxmodes`.
+- **Boot script:** references `tsd_imx60`, `J5_CPU_REG_CTRL_SECTAP`, mounts qnx6 root
+  `mount -b -t qnx6 ... /dev/hd0t177 /`; shell access gated on a CPU register tap value.
+- Standard QNX userland: `ksh`, `ps`, `ls`, `cat`, `mount`, `slogger`, `pipe`, `inetd`,
+  `libm.so`, `libstdc++.so.6`, `libz`, `socket.so`, `passwd`/`group`/`shadow`.
+
+This independently confirms the target: **TechniSat MIB2 Standard, NXP i.MX6Q, QNX Neutrino
+6.5.0 SMP**, with a TechniSat HMI on the WFD/Screen graphics stack.
+
+**Parsing limitation (honest):** `tools/ifs-dir.js` reads the imagefs header correctly, but
+individual `image_dirent` records do not decode cleanly with the stock `sys/image.h` layout
+(fields appear packed/encoded, consistent with the TechniSat `…_sec` wrapper). Component
+names above are taken from readable path strings, not a fully validated directory walk.
+A clean dirent decode (and the exact TechniSat encoding) is still to be resolved.
