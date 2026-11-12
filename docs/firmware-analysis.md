@@ -27,6 +27,18 @@
 We do not use fabricated/modified binaries as proof of authentic execution, and we do not
 defeat secure boot, component protection, or the metainfo2 digital signature.
 
+### Download attempt result (2026-11-12, verified)
+Authentic MIB2 Standard firmware is **not** available at a stable public direct URL. The
+TechniSat/Preh upgrade repo (Feserich/mib2std-zr-firmware-upgrade) states the firmware lives in
+the **"MIB Solutions" MEGA.nz folder** (link rotates, forum-sourced, key-gated) and in
+**login-walled forums**. Therefore it cannot be downloaded here without a current valid link
+or account; guessing links / bypassing logins is out of scope. Real acquisition venues:
+- https://github.com/Feserich/mib2std-zr-firmware-upgrade (scripts/docs; points to MEGA folder)
+- https://www.digital-eliteboard.com/threads/mib2-std-pq-zr-how-to-update.494459/ (login)
+- https://forum.xda-developers.com/t/success-to-hack-technisat-mib2-infotainment-system.3584185/ (login)
+The repo scripts and the MIB toolboxes are patching/modification tools, NOT authentic firmware,
+and are not used as proof of authentic execution.
+
 ## 4. Reference image obtained (openly licensed, CPU/device validation ONLY)
 | File | Source | SHA-256 | License |
 |---|---|---|---|
