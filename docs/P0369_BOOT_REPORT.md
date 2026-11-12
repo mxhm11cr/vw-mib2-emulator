@@ -43,8 +43,13 @@ the "authentic instructions executed" boot milestone. The image has a TechniSat 
 be parsed with the QNX IFS (`dumpifs`) format rather than guessed.
 
 ## Current blocker (precise)
-1. Resolve the QNX IFS header → exact startup entry offset + load address (parse IFS directory;
-   `dumpifs` format). Blind entry guessing is exhausted; need format-correct parsing.
+1. Resolve the QNX IFS header → exact startup entry (`startup_vaddr`) + load address
+   (`image_paddr`). The firmware's own `dumpifs` confirms these fields exist, but the QNX
+   `IMAGE_SIGNATURE`/`STARTUP_SIGNATURE` constants (QNX `sys/image.h`) are required to locate
+   the header. Empirical isolation (tools/ifs-sig.js cross-referencing dumpifs) is exhausted:
+   the header is NOT in the first 0x400 bytes (TechniSat secure wrapper), and whole-image
+   constant matching only yields coincidental ARM-code overlaps. **Next: obtain the QNX IFS
+   header signature constants / sys/image.h, then parse startup_vaddr format-correctly.**
 2. QEMU has no VW-MIB i.MX6 board; full boot needs custom peripherals (UART, GIC/AVIC, timers,
    eMMC/SDHCI, IPU display) and the QNX boot flow.
-Next: implement a QNX IFS parser to extract startup/procnto offsets and the entry, then re-run.
+Blind entry guessing is discontinued (no new evidence); resume only with the header definition.
