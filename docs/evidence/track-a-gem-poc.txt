@@ -1,0 +1,20 @@
+# Track A PoC 1 — authentic GEM bytecode execution on Windows/JDK 21
+# Date: 2026-11-13T06:58:58.426Z
+# JDK: 
+# Authentic artifact: F:\vw-mib2-emulator\firmware\analysis\hmizr\tsd\tmp\hmi\HMI\jar\GEM.jar
+# Class under test: de.audi.gem.collections.HashtableOfLong (unmodified, Java 1.2 bytecode v46)
+# Harness: src/track-a/poc/GemPoc.java (our own test code, not firmware)
+
+[poc] authentic class: de.audi.gem.collections.HashtableOfLong
+[poc] code source: file:/F:/vw-mib2-emulator/firmware/analysis/hmizr/tsd/tmp/hmi/HMI/jar/GEM.jar
+[poc] classloader: jdk.internal.loader.ClassLoaders$AppClassLoader@70dea4e
+[poc] size()=3
+[poc] get(200)=MEDIA_UPDATED
+[poc] get(999)=null
+[poc] containsKey(300)=true
+[poc] containsKey(999)=false
+[poc] toString()=100 -> RADIO
+200 -> MEDIA_UPDATED
+300 -> PHONE
+
+[poc] PASS: authentic GEM bytecode executed correctly on JDK 21
