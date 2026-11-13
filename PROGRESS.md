@@ -15,7 +15,7 @@ Two complementary tracks (effort ≈ 70% A / 30% B):
 | Launch architecture recovered | **Done** | runHMI.sh: de.vw.mib.MIBMain, J9 2.3 foun11, JXE bootclasspath, OSGi bundles |
 | Reference architecture studied (public docs only, no file reuse) | **Done** | JDK 21 + ANGLE GL ES 2 + Swing + Java backend; docs/TRACK_A_HMI_ANALYSIS.md §4 |
 | A1: authentic GEM bytecode executes on JDK 21 | **Verified 2026-11-13** | docs/evidence/track-a-gem-poc.txt; `npm run track-a:poc` |
-| A2: J9 ROM → .class converter (single class) | Pending | rom.classes: J99J, jar2jxe 2.3, 5.59 MB, interpretable |
+| A2: J9 ROM → .class converter (single class) | **Verified 2026-11-13** | authentic java/lang/Void converted + executed on JDK 21 (Void.TYPE==void.class); docs/evidence/track-a-void-poc.txt; `npm run track-a:void`; tests 14/14 |
 | A3: full platform JXE converted, MIBMain loads | Pending | |
 | A4: MIBHMI.jxe extracted from HMI IFS + converted | Pending | IFS is plain QNX (machine=0); imagefs dirent decode pending |
 | A5: JSR-231 GL adapter renders authentic view | Pending | |
@@ -55,3 +55,7 @@ Two complementary tracks (effort ≈ 70% A / 30% B):
 - 2026-11-13: Phase 0 recovery (tests 8/8, Node 25 test-runner fix, firmware archives gitignored).
   Track A started: J9+HMI extracted, architecture recovered, reference studied (no reuse),
   **A1 verified — authentic GEM bytecode executes on Windows/JDK 21** (docs/evidence/track-a-gem-poc.txt).
+  **A2 verified — independent J9 2.3 ROM→.class converter; authentic firmware java/lang/Void
+  executes on JDK 21** (docs/evidence/track-a-void-poc.txt). ROM format fully reverse-engineered
+  from bytes (directory self-rel pairs, methodsOffset=raw[8]+32 validated 1415/1415, LE bytecode
+  operands, J9 return opcodes 0xAC/AD/AE, CP shapes). Tests 14/14.

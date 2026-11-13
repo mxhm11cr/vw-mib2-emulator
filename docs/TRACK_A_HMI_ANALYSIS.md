@@ -53,6 +53,36 @@ Package directory (from ZIP entries): `de.vw.mib.*` (graphics/activation/debug/e
 **Conversion required:** J9 ROM classes are not standard .class files. To execute on a
 modern JVM we must convert ROM → standard class files (own implementation, see §5).
 
+### 3a. J9 2.3 ROM format — empirically reverse-engineered (verified, reproducible)
+
+Derived purely from firmware bytes (`src/track-a/jxe/rom-probe*.js`), cross-validated against
+the standard `classes.zip` counterparts via javap. No external code copied.
+
+- **Image header (48 B):** magic `J99J`, version, romSize@8, classNameCount@0x0C (1436),
+  uuid@0x20. Class directory @0x30: classNameCount × 8 B entries.
+- **Directory entry:** `{i32 selfRelName; i32 selfRelClass}` — BOTH self-relative from the
+  field address. `name = utf8(eo + name)`, `classOff = (eo+4) + class`. 1436/1436 names resolve,
+  zero mismatch (test-verified).
+- **J9UTF8:** u16 length + bytes, padded to even alignment. General string pool (class names,
+  method names, descriptors, string constants).
+- **J9ROMClass:** +0 romSize, +8 className(selfRel), +12 superclass(selfRel), +16 modifiers,
+  +20 numInterfaces, +24 fieldsOffset, +28 numMethods, +32 (methodsOffset−32), +36 numFields.
+  **methodsOffset = raw[8] + 32** — validated 1415/1415 classes with methods (21 have none).
+- **J9ROMMethod (20 B header + inline bytecode):** {name(selfRel), sig(selfRel), modifiers,
+  m12, m16}. `m12 = maxStack(u16) | bytecodeWords(u16)<<16`; bytecode padded to 4 B words.
+- **J9 bytecode:** standard JVM opcodes EXCEPT returns are renumbered, and ALL multi-byte
+  operands are LITTLE-ENDIAN (must convert to big-endian for standard .class):
+  - 0xAC=return0(void)→0xB1; 0xAD=return1(1-word)→ireturn/freturn/areturn by type;
+    0xAE=return2(2-word)→lreturn/dreturn. (Verified across Void/Byte/Boolean/Object.)
+  - CP operands, branch offsets, switch data: LE→BE.
+- **Constant pool @+112 (class-relative), 8 B items:** Class(selfRelName, 2),
+  String(selfRelName, 1), Ref(classIdx1based, selfRelNameAndType), NameAndType(selfRelName,
+  selfRelDesc). Ref→Methodref if descriptor starts with '(' else Fieldref. The field table
+  (12 B entries {name, desc, modifiers}) is embedded within the CP region at fieldsOffset.
+- **Converter:** `src/track-a/jxe/rom-to-class.js` (parse → rebuild standard CP → remap
+  bytecode indices → LE→BE → emit .class v46). Verified: converted `java/lang/Void` loads and
+  executes on JDK 21 via `--patch-module java.base`, `Void.TYPE == void.class`.
+
 ## 4. Reference architecture (public documentation only — NO file reuse)
 
 `https://github.com/JEtsKi8271/mibstd2-emulator` README (fetched 2026-11-13) documents:
@@ -89,7 +119,7 @@ written from our own firmware artifacts.**
 | # | Milestone | Status | Evidence |
 |---|---|---|---|
 | A1 | Authentic GEM bytecode executes on Windows/JDK 21 | **Verified 2026-11-13** | `docs/evidence/track-a-gem-poc.txt`; repro: `npm run track-a:poc` |
-| A2 | J9 ROM single-class → .class conversion + execution | Pending | |
+| A2 | J9 ROM single-class → .class conversion + execution | **Verified 2026-11-13** | authentic java/lang/Void executes on JDK 21 (`Void.TYPE==void.class`); `docs/evidence/track-a-void-poc.txt`; repro `npm run track-a:void`; tests 14/14 |
 | A3 | Full platform JXE converted; de.vw.mib.MIBMain class loads | Pending | |
 | A4 | MIBHMI.jxe extracted from IFS + converted | Pending | |
 | A5 | JSR-231 GL adapter renders an authentic view | Pending | |
