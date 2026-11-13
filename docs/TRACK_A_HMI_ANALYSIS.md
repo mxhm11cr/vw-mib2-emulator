@@ -83,6 +83,27 @@ the standard `classes.zip` counterparts via javap. No external code copied.
   bytecode indices → LE→BE → emit .class v46). Verified: converted `java/lang/Void` loads and
   executes on JDK 21 via `--patch-module java.base`, `Void.TYPE == void.class`.
 
+### 3b. A3 batch-conversion format discoveries (verified by JVM loading + behavioral execution)
+
+- **Field table** offset = `raw[10]+40` (NOT raw[6]). Entries are 12-byte {name, desc, modifiers};
+  compile-time-constant fields (e.g. serialVersionUID) carry extra ConstantValue words → scan to
+  the next valid identifier. Field modifiers mask J9 bits (`& 0xefff`, strip synthetic 0x1000 which
+  crashes the JVM field-layout builder for patched core classes; clear illegal final+volatile).
+- **J9 CP index space EXCLUDES field-table slots** — bytecode CP indices skip them, so the parser
+  must drop field slots to keep array position == J9 index (else every post-field index is offset).
+- **Constant typing** (Integer/Float/Long/Double share encodings): resolved by tracking stack depth
+  and matching each ldc/ldc2_w to its consumer — putfield/putstatic field descriptor, or invoke*
+  parameter type (`scanConstKinds` + `stackDelta`). Empty "" String constants are valid (length 0).
+- **J9 quick opcodes** (verified against standard bytecode): 0xD7=aload_0, 0xE7=invokeinterface
+  (5-byte, index at +3 LE), 0xF9=ldc2_w; returns 0xAC/AD/AE/AF mapped by return type; 0xB0/B1 are
+  standard areturn/return. Unresolved: 0xD5/0xEE (6 IBM text utility classes).
+- **NameAndType** entries are created from each Ref's exact resolved natOff (the grid-walked NAT
+  section is misaligned by the 12-byte field table, so grid NATs are discarded).
+- **Verification:** `VerifyHarness` (Class.forName linking) + `BehaviorTest` (full execution).
+  Behavioral execution catches lazy-verification gaps (e.g. float constants in method args).
+  Result: 747/749 non-java.* classes verify; all 41 de.vw HMI classes verify; authentic
+  IntObjectOptHashMap put/get/remove/clear/growth executes correctly. Reproducible `platform.jar`.
+
 ## 4. Reference architecture (public documentation only — NO file reuse)
 
 `https://github.com/JEtsKi8271/mibstd2-emulator` README (fetched 2026-11-13) documents:
@@ -120,7 +141,7 @@ written from our own firmware artifacts.**
 |---|---|---|---|
 | A1 | Authentic GEM bytecode executes on Windows/JDK 21 | **Verified 2026-11-13** | `docs/evidence/track-a-gem-poc.txt`; repro: `npm run track-a:poc` |
 | A2 | J9 ROM single-class → .class conversion + execution | **Verified 2026-11-13** | authentic java/lang/Void executes on JDK 21 (`Void.TYPE==void.class`); `docs/evidence/track-a-void-poc.txt`; repro `npm run track-a:void`; tests 14/14 |
-| A3 | Full platform JXE converted; de.vw.mib.MIBMain class loads | Pending | |
+| A3 | Full platform JXE batch conversion + JVM verification + behavioral execution | **Verified 2026-11-13** | 1422/1436 converted; 747 JVM-verify (all 41 de.vw); authentic IntObjectOptHashMap executes; `docs/evidence/track-a-behavior-poc.txt`; repro `npm run track-a:behavior`; tests 17/17 |
 | A4 | MIBHMI.jxe extracted from IFS + converted | Pending | |
 | A5 | JSR-231 GL adapter renders an authentic view | Pending | |
 | A6 | DSI simulation + authentic main menu + mouse input | Pending | |

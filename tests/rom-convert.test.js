@@ -64,3 +64,45 @@ test('J9 branch offsets convert LE -> BE', () => {
   assert.ok(bytes.includes(Buffer.from([0xb1])), 'contains standard return opcode');
   assert.ok(!bytes.includes(Buffer.from([0xb2, 0x03, 0x00])), 'no leftover LE CP operand');
 });
+
+// Count CP entries of a given tag in a converted class file.
+function cpTagCount(bytes, wantTag) {
+  let p = 8; const count = bytes.readUInt16BE(p); p += 2; let n = 0;
+  for (let i = 1; i < count; i++) {
+    const tag = bytes[p]; p++;
+    if (tag === wantTag) n++;
+    if (tag === 1) p += 2 + bytes.readUInt16BE(p);
+    else if (tag === 5 || tag === 6) { p += 8; i++; }
+    else if (tag === 7 || tag === 8 || tag === 16 || tag === 19 || tag === 20) p += 2;
+    else if (tag === 15) p += 3;
+    else p += 4;
+  }
+  return n;
+}
+
+(haveRom ? test : test.skip)('float constants typed via stack-depth resolver (IntObjectOptHashMap)', () => {
+  const { bytes } = convertClass(readFileSync(romPath), 'de/vw/extlibs/collections/ints/IntObjectOptHashMap');
+  assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
+  // DEFAULT_LOAD_FACTOR / DEFAULT_RESIZE_THRESHOLD are float constants loaded as <init>(IFF)V
+  // args; the resolver must type them Float (tag 4), not Integer.
+  assert.ok(cpTagCount(bytes, 4) >= 2, 'expected >=2 Float CP entries');
+});
+
+(haveRom ? test : test.skip)('all de.vw HMI classes convert without error', () => {
+  const b = readFileSync(romPath);
+  const img = parseRomImage(b);
+  const vw = img.classes.filter((c) => c.name.startsWith('de/vw'));
+  assert.ok(vw.length >= 30, 'expected >=30 de.vw classes, got ' + vw.length);
+  for (const c of vw) {
+    const { bytes } = convertClass(b, c.name, img);
+    assert.equal(bytes.readUInt32BE(0), 0xcafebabe, c.name + ' magic');
+  }
+});
+
+(haveRom ? test : test.skip)('empty String constant preserved (not misclassified as Float)', () => {
+  const b = readFileSync(romPath);
+  const { bytes } = convertClass(b, 'de/vw/extlibs/collections/ints/IntObjectOptHashMap');
+  // toString uses an empty "" String constant; ensure no spurious Float NaN from it.
+  assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
+  assert.ok(cpTagCount(bytes, 8) >= 1, 'has String CP entries');
+});

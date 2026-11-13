@@ -19,7 +19,10 @@ const javac = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin', 'javac'
 const java = process.env.JAVA_HOME ? join(process.env.JAVA_HOME, 'bin', 'java') : 'java';
 
 const { bytes, lines } = convertClass(readFileSync(romPath), 'java/lang/Void');
-const classDir = join(root, 'firmware/analysis/converted/java/lang');
+// Isolated module dir: --patch-module java.base crashes if the dir also contains
+// non-java.base classes, so patch a clean directory holding only the converted Void.
+const moduleRoot = join(root, 'firmware/analysis/poc/void-module');
+const classDir = join(moduleRoot, 'java/lang');
 mkdirSync(classDir, { recursive: true });
 writeFileSync(join(classDir, 'Void.class'), bytes);
 console.log('[run-void] converted authentic java/lang/Void:', bytes.length, 'bytes');
@@ -29,7 +32,7 @@ const pocOut = join(root, 'firmware/analysis/poc/out');
 mkdirSync(pocOut, { recursive: true });
 execFileSync(javac, ['-d', pocOut, join(root, 'src/track-a/poc/TestConvertedVoid.java')], { stdio: 'inherit' });
 
-const convertedRoot = join(root, 'firmware/analysis/converted');
+const convertedRoot = moduleRoot;
 console.log('[run-void] executing firmware Void on JDK 21 (--patch-module java.base) ...');
 const output = execFileSync(java, ['--patch-module', 'java.base=' + convertedRoot, '-cp', pocOut, 'TestConvertedVoid'], { encoding: 'utf8' });
 process.stdout.write(output);

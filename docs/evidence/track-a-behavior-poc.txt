@@ -1,0 +1,10 @@
+# Track A A3 — authentic VW HMI code behavioral execution on JDK 21
+# Date: 2026-11-13T09:05:10.031Z
+# Source: de.vw.extlibs.collections.ints.IntObjectOptHashMap from P0369 platform JXE
+#         (tsd.mibstd2.hmi.v2.jxe / rom.classes), converted by independent ROM->.class converter
+# Platform JAR: F:\vw-mib2-emulator\firmware\analysis\platform.jar
+# Harness: src/track-a/poc/BehaviorTest.java (our test code; executed class is authentic VW HMI)
+
+[behavior] authentic class: de.vw.extlibs.collections.ints.IntObjectOptHashMap
+[behavior] code source: file:/F:/vw-mib2-emulator/firmware/analysis/platform.jar
+[behavior] PASS: authentic VW HMI collection executed correctly on JDK 21 (put/get/remove/clear/growth)
