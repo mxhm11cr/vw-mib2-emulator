@@ -49,6 +49,7 @@ export function parseCP(b, classOff, cpStartRel, cpEndRel, fieldStart = -1, fiel
       // Validate the target: embedded field-table modifier words can masquerade as Refs
       // whose natOff resolves to garbage (non-ASCII) -> would corrupt the standard CP.
       const natOff = off + 4 + i32(b, off + 4);
+      if (natOff < 0 || natOff + 8 > b.length) { items.push({ shape: 'Unknown', s1, s2, off }); continue; }
       const natName = utf8At(b, selfRel(b, natOff));
       const natDesc = utf8At(b, selfRel(b, natOff + 4));
       if (printable(natName) && printable(natDesc) && /^[A-Za-z_$<(]/.test(natName)) items.push({ shape: 'Ref', classIndex: s1, natOff, natName, natDesc, off });
@@ -531,7 +532,20 @@ export function convertClass(b, target, img = parseRomImage(b)) {
     methods.push({ ...m, bytecode, maxLocals });
     lines.push(`  ${m.name}${m.sig} mods=0x${m.modifiers.toString(16)} stack=${m.maxStack} locals=${maxLocals} bc=${bytecode.length}B`);
   }
-  const bytes = writeClassFile({ className: target, superName: h.superclassName, modifiers: raw[4], interfaces: [], fields, methods, cp });
+  // Interface list: raw[5]=numInterfaces, raw[6] (offset 24) is a self-rel pointer to an
+  // array of self-rel pointers to interface class names (verified: MIBMain$1 -> Runnable).
+  const interfaces = [];
+  const numIfaces = raw[5];
+  if (numIfaces > 0 && numIfaces < 256) {
+    const arr = selfRel(b, base + 24);
+    if (arr >= 0 && arr + numIfaces * 4 <= b.length) {
+      for (let i = 0; i < numIfaces; i++) {
+        const nm = utf8At(b, selfRel(b, arr + i * 4));
+        if (nm && nm.length < 256 && /^[\w$/]+$/.test(nm)) interfaces.push(nm);
+      }
+    }
+  }
+  const bytes = writeClassFile({ className: target, superName: h.superclassName, modifiers: raw[4], interfaces, fields, methods, cp });
   return { bytes, info: { className: target, romSize: h.romSize, methods: methods.length, fields: fields.length, cpItems: items.length, shapes }, lines };
 }
 

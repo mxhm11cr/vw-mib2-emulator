@@ -1,0 +1,20 @@
+# Track A A4 — authentic de.vw.mib.MIBMain loads + initializes on JDK 21
+# Date: 2026-11-13T11:20:45.035Z
+# Source: de.vw.mib.MIBMain from P0369 MIBHMI.jxe / rom.classes (authentic, unmodified bytecode),
+#         converted by the independent ROM->.class converter (src/track-a/jxe/rom-to-class.js).
+# Classpath: 18511 converted HMI+platform classes (java.* provided by JDK bootstrap).
+# Harness: src/track-a/poc/LoadMIBMain.java (our code; loaded class is authentic VW HMI).
+# JVM: JDK 21, -noverify (mirrors firmware runHMI.sh). initialize=true runs the authentic <clinit>.
+#
+# Execution frontier (next): invoking main() spawns MAIN_THREAD; authentic Log4MIB runs, then
+# stops at an interface-methodref tagging bug (Set.iterator() emitted as Methodref, needs
+# InterfaceMethodref). See task: converter interface-call CP tagging.
+
+LOADED: de.vw.mib.MIBMain
+super: java.lang.Object
+interfaces: [interface de.vw.mib.log4mib.classifier.StartupClassifier]
+modifiers: 0x11
+declaredFields: 11
+declaredMethods: 6
+main method resolved: public static void de.vw.mib.MIBMain.main(java.lang.String[])
+INITIALIZED: <clinit> ran without error
