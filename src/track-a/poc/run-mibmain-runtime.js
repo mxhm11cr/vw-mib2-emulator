@@ -60,11 +60,13 @@ const props = {
   'de.vw.mib.threads.disableWatchdog': 'true',
   'STARTUP_LUM_READY': 'true',
   'de.vw.mib.runmode.is_normal': 'true',
-  'viewhandler.format': 'zip',
+  'viewhandler.format': 'jar',
   'dsi.adapter.factory.class': 'tsd.mibstd2.hmi.dsi.base.NavigationFactory',
   'GenericEvents.activatePooling': 'true',
   'GenericEventPool.poolSize': '2048',
   'GenericEventPool.poolPreFill': '512',
+  'de.vw.mib.graphics.font.mockspi': 'true',
+  'de.vw.mib.graphics.image.nocheckerboard': 'true',
 };
 const jniDll = join(rtDir, 'tsd.mibstd2.hmi.dsi.native.dll');
 if (!existsSync(jniDll)) {
@@ -74,12 +76,12 @@ const args = ['-Xmx256m'];
 for (const [k, v] of Object.entries(props)) args.push(`-D${k}=${v}`);
 args.push('-cp', jarPath + sep + ltDir, 'LoadMIBMain', 'de.vw.mib.MIBMain', 'run');
 
-console.log('[runtime] starting authentic HMI (sampling 12s) ...');
+console.log('[runtime] starting authentic HMI (sampling 30s) ...');
 const child = spawn(bin('java'), args, { cwd: rtDir });
 let out = '';
 child.stdout.on('data', (d) => { out += d; });
 child.stderr.on('data', (d) => { out += d; });
-await new Promise((res) => { const t = setTimeout(() => { child.kill(); res(); }, 12000); child.on('exit', () => { clearTimeout(t); res(); }); });
+await new Promise((res) => { const t = setTimeout(() => { child.kill(); res(); }, 30000); child.on('exit', () => { clearTimeout(t); res(); }); });
 
 const frontier = out.includes('=== ACTIVE BUNDLES') ? 'OSGi Managed Bundles Active' : 'see output';
 const evidence = `# Track A A4 — authentic VW HMI startup on JDK 21 (runtime frontier)
@@ -93,7 +95,7 @@ const evidence = `# Track A A4 — authentic VW HMI startup on JDK 21 (runtime f
 # Execution frontier: ${frontier}
 #
 # Sampled output (12s):
-${out.split('\n').filter((l) => !l.includes('java.library.path')).slice(0, 300).join('\n')}
+${out.split('\n').filter((l) => !l.includes('java.library.path')).slice(0, 2000).join('\n')}
 `;
 const evidencePath = join(root, 'docs/evidence/track-a-mibmain-runtime.txt');
 writeFileSync(evidencePath, evidence);

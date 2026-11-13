@@ -1,0 +1,392 @@
+[
+  {
+    "name": "dispatchGlBufferData",
+    "sig": "(IILjava/lang/Object;IZII)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlBufferSubData",
+    "sig": "(IIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCheckFramebufferStatusEXT",
+    "sig": "(II)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCompressedTexImage2D",
+    "sig": "(IIIIIIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCompressedTexImage2DL",
+    "sig": "(IIIIIIIJI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCompressedTexSubImage2D",
+    "sig": "(IIIIIIIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCompressedTexSubImage2DL",
+    "sig": "(IIIIIIIIJI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCreateProgram",
+    "sig": "(I)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlCreateShader",
+    "sig": "(II)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlDeleteBuffers",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlDeleteFramebuffersEXT",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlDeleteRenderbuffersEXT",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlDeleteTextures",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlDrawElements",
+    "sig": "(IIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlFinish",
+    "sig": "(I)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlFlush",
+    "sig": "(I)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGenBuffers",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGenFramebuffersEXT",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGenRenderbuffersEXT",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGenTextures",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetActiveAttrib",
+    "sig": "(IIILjava/lang/Object;IZLjava/lang/Object;IZLjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetActiveUniform",
+    "sig": "(IIILjava/lang/Object;IZLjava/lang/Object;IZLjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetAttachedShaders",
+    "sig": "(IILjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetAttribLocation",
+    "sig": "(ILjava/lang/Object;I)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetBooleanv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetBufferParameteriv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetError",
+    "sig": "(I)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetFloatv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetFramebufferAttachmentParameterivEXT",
+    "sig": "(IIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetIntegerv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetProgramInfoLog",
+    "sig": "(IILjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetProgramiv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetRenderbufferParameterivEXT",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetShaderInfoLog",
+    "sig": "(IILjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetShaderPrecisionFormat",
+    "sig": "(IILjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetShaderSource",
+    "sig": "(IILjava/lang/Object;IZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetShaderiv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetString",
+    "sig": "(II)Ljava/lang/String;",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetTexParameterfv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetTexParameteriv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetUniformLocation",
+    "sig": "(ILjava/lang/Object;I)I",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetUniformfv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetUniformiv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetVertexAttribfv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlGetVertexAttribiv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsBuffer",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsEnabled",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsFramebufferEXT",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsProgram",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsRenderbufferEXT",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsShader",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlIsTexture",
+    "sig": "(II)Z",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlReadPixels",
+    "sig": "(IIIIIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlReadPixelsL",
+    "sig": "(IIIIIIJI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlShaderBinary",
+    "sig": "(ILjava/lang/Object;IZILjava/lang/Object;IZII)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlShaderSource",
+    "sig": "(IILjava/lang/Object;Ljava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexImage2DL",
+    "sig": "(IIIIIIIIJI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexImage2D",
+    "sig": "(IIIIIIIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexParameterfv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexParameteriv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexSubImage2DL",
+    "sig": "(IIIIIIIIJI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlTexSubImage2D",
+    "sig": "(IIIIIIIILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform1fv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform1iv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform2fv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform2iv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform3fv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform3iv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform4fv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniform4iv",
+    "sig": "(IILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniformMatrix2fv",
+    "sig": "(IIZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniformMatrix3fv",
+    "sig": "(IIZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlUniformMatrix4fv",
+    "sig": "(IIZLjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlVertexAttrib1fv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlVertexAttrib2fv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlVertexAttrib3fv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlVertexAttrib4fv",
+    "sig": "(ILjava/lang/Object;IZI)V",
+    "isStatic": false
+  },
+  {
+    "name": "dispatchGlVertexAttribPointer",
+    "sig": "(IIIZILjava/lang/Object;IZI)V",
+    "isStatic": false
+  }
+]

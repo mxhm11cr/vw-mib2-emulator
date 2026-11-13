@@ -6,6 +6,8 @@ import { convertClass, convertBytecode } from '../src/track-a/jxe/rom-to-class.j
 
 const romPath = 'firmware/analysis/rom/rom.classes';
 const haveRom = existsSync(romPath);
+const hmiRomPath = 'firmware/analysis/p0369/hmi/rom.classes';
+const haveHmiRom = existsSync(hmiRomPath);
 
 test('J9 return opcodes map to standard JVM by return type', () => {
   const m = new Map([[1, 5]]);
@@ -105,4 +107,35 @@ function cpTagCount(bytes, wantTag) {
   // toString uses an empty "" String constant; ensure no spurious Float NaN from it.
   assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
   assert.ok(cpTagCount(bytes, 8) >= 1, 'has String CP entries');
+});
+
+test('J9 opcode 0xe5 quick return maps to standard JVM return with discarded switch key', () => {
+  // Pattern A: 02 36 04 1b 15 04 e5 00 -> 02 36 04 00 15 04 ac 00 (nop iload_4 ireturn nop)
+  const a = convertBytecode(Buffer.from([0x02, 0x36, 0x04, 0x1b, 0x15, 0x04, 0xe5, 0x00]), new Map(), 'I');
+  assert.equal(a.bytecode[3], 0x00, 'iload_1 nopped out');
+  assert.equal(a.bytecode[4], 0x15, 'iload retained');
+  assert.equal(a.bytecode[5], 0x04, 'local 4 retained');
+  assert.equal(a.bytecode[6], 0xac, 'e5 mapped to ireturn');
+
+  // Pattern C: 1b 08 7a 01 e5 -> 00 00 00 01 b0 (nop nop nop aconst_null areturn)
+  const c = convertBytecode(Buffer.from([0x1b, 0x08, 0x7a, 0x01, 0xe5]), new Map(), 'L');
+  assert.equal(c.bytecode[0], 0x00, 'iload_1 nopped out');
+  assert.equal(c.bytecode[1], 0x00, 'iconst_5 nopped out');
+  assert.equal(c.bytecode[2], 0x00, 'ishr nopped out');
+  assert.equal(c.bytecode[3], 0x01, 'aconst_null retained');
+  assert.equal(c.bytecode[4], 0xb0, 'e5 mapped to areturn');
+});
+
+(haveHmiRom ? test : test.skip)('double constants returned directly from methods typed Double (ASLCarUtil.bus2hmi)', () => {
+  const b = readFileSync(hmiRomPath);
+  const { bytes } = convertClass(b, 'de/vw/mib/asl/internal/car/ASLCarUtil');
+  assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
+  assert.ok(cpTagCount(bytes, 6) >= 4, 'expected >=4 Double CP entries');
+});
+
+(haveHmiRom ? test : test.skip)('float constants in ternary branches typed Float (SharedDrawableRenderer.<clinit>)', () => {
+  const b = readFileSync(hmiRomPath);
+  const { bytes } = convertClass(b, 'de/vw/mib/graphics/internal/drawable/renderer/SharedDrawableRenderer');
+  assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
+  assert.ok(cpTagCount(bytes, 4) >= 1, 'expected >=1 Float CP entry');
 });

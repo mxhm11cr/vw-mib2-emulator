@@ -1,6 +1,7 @@
 // Build script for Windows JNI adapters:
 // 1. tsd.mibstd2.hmi.dsi.native.dll (HMI DSI SPI middleware)
 // 2. swap.dll (MicroDoc ObjectSwapper binary resource deserializer)
+// 3. tsd.opengl.jsr231.native.dll (TechniSat / VW OpenGL stack via Google ANGLE)
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -47,3 +48,4 @@ function compileDll(srcName, dllName) {
 
 compileDll('tsd_mibstd2_hmi_dsi_native.c', 'tsd.mibstd2.hmi.dsi.native.dll');
 compileDll('swap.c', 'swap.dll');
+compileDll('tsd_opengl_jsr231_native.c', 'tsd.opengl.jsr231.native.dll');

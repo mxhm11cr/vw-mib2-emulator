@@ -321,6 +321,28 @@ export function convertBytecode(bc, indexMap, retType, refDesc) {
       i += 6;
       continue;
     }
+    if (op === 0xe5) { // J9 quick return from empty switch (pops switch key beneath return value and returns)
+      if (i >= 4 && out[i - 4] === 0x1b && out[i - 3] === 0x08 && out[i - 2] === 0x7a && out[i - 1] === 0x01) {
+        // Pattern C (invoke): 1b 08 7a 01 e5 -> nop nop nop aconst_null areturn
+        out[i - 4] = 0x00; out[i - 3] = 0x00; out[i - 2] = 0x00;
+        out[i] = mapReturn(0xb0, retType);
+        i += 1; continue;
+      }
+      if (i >= 3 && out[i - 3] === 0x1b && out[i - 2] === 0x15 && out[i - 1] === 0x04) {
+        // Pattern A (a0..a4): 1b 15 04 e5 -> nop iload_4 ireturn
+        out[i - 3] = 0x00;
+        out[i] = mapReturn(0xac, retType);
+        i += 1; continue;
+      }
+      if (i >= 4 && out[i - 4] === 0x15 && out[i - 3] === 0x05 && out[i - 2] === 0x15 && out[i - 1] === 0x04) {
+        // Pattern B (getIndex): 15 05 15 04 e5 -> nop nop iload_4 ireturn
+        out[i - 4] = 0x00; out[i - 3] = 0x00;
+        out[i] = mapReturn(0xac, retType);
+        i += 1; continue;
+      }
+      out[i] = mapReturn(0xac, retType);
+      i += 1; continue;
+    }
     if (op >= 0xca && op <= 0xff && !CP16.has(op)) throw new Error(`J9 private opcode 0x${op.toString(16)} @${i} needs handling`);
     if (op === 0x12) { remap(i + 1, false); i += 2; continue; } // ldc
     if (op === 0xb9 || op === 0xba) { remap(i + 1, true); i += 5; continue; } // invokeinterface/invokedynamic
@@ -413,7 +435,7 @@ function stackDelta(op, bc, p) {
   if (op === 0xa7) return 0;
   if (op === 0xa8) return 1;
   if (op === 0xaa || op === 0xab) return -1;
-  if (op >= 0xac && op <= 0xb1) return (op === 0xad || op === 0xaf) ? -2 : -1;
+  if ((op >= 0xac && op <= 0xb1) || op === 0xe5) return (op === 0xad || op === 0xaf) ? -2 : -1;
   if (op === 0xbb) return 1;
   if (op === 0xbc || op === 0xbd || op === 0xbe || op === 0xc0 || op === 0xc1) return 0;
   if (op === 0xbf || op === 0xc2 || op === 0xc3 || op === 0xc6 || op === 0xc7) return -1;
@@ -452,130 +474,238 @@ function scanConstKinds(b, base, mStarts, romSize, items) {
   for (let mi = 0; mi < mStarts.length; mi++) {
     const words = (u32(b, base + mStarts[mi] + 12) >>> 16) & 0xffff;
     if (!words) continue;
+    const mSig = utf8At(b, selfRel(b, base + mStarts[mi] + 4));
+    const rawRet = mSig ? mSig.slice(mSig.indexOf(')') + 1) : '';
+    const retType = rawRet ? rawRet[0] : 'V';
     const bcStart = base + mStarts[mi] + 20;
     const bcEnd = mi + 1 < mStarts.length ? base + mStarts[mi + 1] : base + romSize;
     const bc = b.subarray(bcStart, Math.min(bcStart + words * 4, bcEnd));
-    let p = 0, depth = 0, pending = [];
-    const prune = () => { pending = pending.filter((e) => e.depth + e.words <= depth); };
-    while (p < bc.length) {
+
+    const stateAt = new Map();
+    const queue = [];
+    const addSuccessor = (succ, depth, pending) => {
+      if (succ < 0 || succ >= bc.length) return;
+      const ex = stateAt.get(succ);
+      if (!ex) {
+        stateAt.set(succ, { depth, pending: pending.slice() });
+        queue.push(succ);
+      } else {
+        let changed = false;
+        for (const e of pending) {
+          if (!ex.pending.some((x) => x.idx === e.idx && x.depth === e.depth)) {
+            ex.pending.push(e);
+            changed = true;
+          }
+        }
+        if (changed) queue.push(succ);
+      }
+    };
+
+    addSuccessor(0, 0, []);
+
+    // Check for exception handlers
+    const exOff = base + mStarts[mi] + 20 + words * 4;
+    if (exOff + 4 <= b.length && exOff + 4 <= bcEnd) {
+      const catchCount = b.readUInt16LE(exOff);
+      if (catchCount > 0 && catchCount < 100) {
+        for (let c = 0; c < catchCount; c++) {
+          const cOff = exOff + 4 + c * 16;
+          if (cOff + 16 <= b.length && cOff + 16 <= bcEnd) {
+            const handlerPc = b.readUInt16LE(cOff + 4);
+            addSuccessor(handlerPc, 1, []);
+          }
+        }
+      }
+    }
+
+    const processOffset = (p) => {
+      const state = stateAt.get(p);
+      let depth = state.depth;
+      let pending = state.pending.slice();
+      const prune = () => { pending = pending.filter((e) => e.depth + e.words <= depth); };
       const op = bc[p];
       const len = Math.max(1, instrLen(bc, p));
+
       if (op === 0x12 || op === 0x13) {
         const idx = op === 0x13 ? bc.readUInt16LE(p + 1) : bc[p + 1];
         if (!kinds.has(idx)) kinds.set(idx, 'ldc');
         pending.push({ idx, depth, words: 1 });
-        depth += 1; p += len; prune(); continue;
+        depth += 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x14 || op === 0xf9) {
         const idx = bc.readUInt16LE(p + 1);
         if (!kinds.has(idx)) kinds.set(idx, 'long');
         pending.push({ idx, depth, words: 2 });
-        depth += 2; p += len; prune(); continue;
+        depth += 2; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
-      if (op === 0xb2 || op === 0xb4) { // getstatic/getfield: push field type
+      if (op === 0xb2 || op === 0xb4) { // getstatic/getfield
         const desc = refDesc.get(bc.readUInt16LE(p + 1));
         depth += typeWords(desc) - (op === 0xb4 ? 1 : 0);
-        p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
-      if (op === 0xb3 || op === 0xb5) { // putstatic/putfield: pop value (+objectref)
+      if (op === 0xb3 || op === 0xb5) { // putstatic/putfield
         const desc = refDesc.get(bc.readUInt16LE(p + 1));
         const vw = typeWords(desc);
         resolve(pending, depth - vw, vw, typeKind(desc));
         depth -= vw + (op === 0xb5 ? 1 : 0);
-        p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x62 || op === 0x66 || op === 0x6a || op === 0x6e || op === 0x72) { // fadd, fsub, fmul, fdiv, frem
         resolve(pending, depth - 1, 1, 'float');
         resolve(pending, depth - 2, 1, 'float');
-        depth -= 1; p += len; prune(); continue;
+        depth -= 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
-      if (op === 0x76 || op === 0x8b || op === 0xae) { // fneg, f2i, freturn
+      if (op === 0x76 || op === 0x8b) { // fneg, f2i
         resolve(pending, depth - 1, 1, 'float');
-        depth += op === 0xae ? -1 : 0; p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
+      }
+      if ((op >= 0xac && op <= 0xb1) || op === 0xe5) { // returns
+        if (retType === 'D') {
+          resolve(pending, depth - 2, 2, 'double');
+          depth -= 2;
+        } else if (retType === 'J') {
+          resolve(pending, depth - 2, 2, 'long');
+          depth -= 2;
+        } else if (retType === 'F') {
+          resolve(pending, depth - 1, 1, 'float');
+          depth -= 1;
+        } else if ('IZBCS'.includes(retType)) {
+          resolve(pending, depth - 1, 1, 'int');
+          depth -= 1;
+        } else if (retType === 'L' || retType === '[') {
+          depth -= 1;
+        }
+        if (depth < 0) depth = 0;
+        prune();
+        return;
+      }
+      if (op === 0xbf) { // athrow
+        depth -= 1;
+        if (depth < 0) depth = 0;
+        prune();
+        return;
       }
       if (op === 0x8c || op === 0x8d) { // f2l, f2d
         resolve(pending, depth - 1, 1, 'float');
-        depth += 1; p += len; prune(); continue;
+        depth += 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x95 || op === 0x96) { // fcmpl, fcmpg
         resolve(pending, depth - 1, 1, 'float');
         resolve(pending, depth - 2, 1, 'float');
-        depth -= 1; p += len; prune(); continue;
+        depth -= 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
-      if (op === 0x51) { // fastore: arrayref, index, value(float)
+      if (op === 0x51) { // fastore
         resolve(pending, depth - 1, 1, 'float');
         resolve(pending, depth - 2, 1, 'int');
-        depth -= 3; p += len; prune(); continue;
+        depth -= 3; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x38 || (op >= 0x43 && op <= 0x46)) { // fstore, fstore_0..3
         resolve(pending, depth - 1, 1, 'float');
-        depth -= 1; p += len; prune(); continue;
+        depth -= 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x63 || op === 0x67 || op === 0x6b || op === 0x6f || op === 0x73) { // dadd, dsub, dmul, ddiv, drem
         resolve(pending, depth - 2, 2, 'double');
         resolve(pending, depth - 4, 2, 'double');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 2; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x77 || op === 0x8f) { // dneg, d2l
         resolve(pending, depth - 2, 2, 'double');
-        p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x8e || op === 0x90) { // d2i, d2f
         resolve(pending, depth - 2, 2, 'double');
-        depth -= 1; p += len; prune(); continue;
+        depth -= 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x97 || op === 0x98) { // dcmpl, dcmpg
         resolve(pending, depth - 2, 2, 'double');
         resolve(pending, depth - 4, 2, 'double');
-        depth -= 3; p += len; prune(); continue;
-      }
-      if (op === 0xaf) { // dreturn
-        resolve(pending, depth - 2, 2, 'double');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 3; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x52) { // dastore
         resolve(pending, depth - 2, 2, 'double');
         resolve(pending, depth - 3, 1, 'int');
-        depth -= 4; p += len; prune(); continue;
+        depth -= 4; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x39 || (op >= 0x47 && op <= 0x4a)) { // dstore, dstore_0..3
         resolve(pending, depth - 2, 2, 'double');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 2; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x61 || op === 0x65 || op === 0x69 || op === 0x6d || op === 0x71 || op === 0x7e || op === 0x80 || op === 0x82) { // ladd..lxor
         resolve(pending, depth - 2, 2, 'long');
         resolve(pending, depth - 4, 2, 'long');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 2; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x75 || op === 0x8a) { // lneg, l2d
         resolve(pending, depth - 2, 2, 'long');
-        p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x88 || op === 0x89) { // l2i, l2f
         resolve(pending, depth - 2, 2, 'long');
-        depth -= 1; p += len; prune(); continue;
+        depth -= 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x94) { // lcmp
         resolve(pending, depth - 2, 2, 'long');
         resolve(pending, depth - 4, 2, 'long');
-        depth -= 3; p += len; prune(); continue;
-      }
-      if (op === 0xad) { // lreturn
-        resolve(pending, depth - 2, 2, 'long');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 3; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x50) { // lastore
         resolve(pending, depth - 2, 2, 'long');
         resolve(pending, depth - 3, 1, 'int');
-        depth -= 4; p += len; prune(); continue;
+        depth -= 4; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x37 || (op >= 0x3f && op <= 0x42)) { // lstore, lstore_0..3
         resolve(pending, depth - 2, 2, 'long');
-        depth -= 2; p += len; prune(); continue;
+        depth -= 2; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0x85 || op === 0x86 || op === 0x87) { // i2l, i2f, i2d
         resolve(pending, depth - 1, 1, 'int');
-        depth += op === 0x86 ? 0 : 1; p += len; prune(); continue;
+        depth += op === 0x86 ? 0 : 1; prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
       if (op === 0xb6 || op === 0xb7 || op === 0xb8 || op === 0xb9 || op === 0xe7) {
         const idx = op === 0xe7 ? bc.readUInt16LE(p + 3) : bc.readUInt16LE(p + 1);
@@ -589,11 +719,83 @@ function scanConstKinds(b, base, mStarts, romSize, items) {
           const ret = desc.slice(desc.indexOf(')') + 1);
           depth -= argWords; depth += typeWords(ret);
         }
-        p += len; prune(); continue;
+        prune();
+        addSuccessor(p + len, depth, pending);
+        return;
       }
+
+      // Branch instructions:
+      if (op === 0xa7) { // goto (16-bit LE relative offset)
+        const target = p + bc.readInt16LE(p + 1);
+        addSuccessor(target, depth, pending);
+        return;
+      }
+      if (op === 0xc8) { // goto_w (32-bit LE relative offset)
+        const target = p + bc.readInt32LE(p + 1);
+        addSuccessor(target, depth, pending);
+        return;
+      }
+      if ((op >= 0x99 && op <= 0xa6) || op === 0xc6 || op === 0xc7) { // conditional branch
+        const target = p + bc.readInt16LE(p + 1);
+        depth += stackDelta(op, bc, p);
+        if (depth < 0) depth = 0;
+        prune();
+        addSuccessor(target, depth, pending);
+        addSuccessor(p + len, depth, pending);
+        return;
+      }
+      if (op === 0xaa) { // tableswitch
+        depth += stackDelta(op, bc, p);
+        if (depth < 0) depth = 0;
+        prune();
+        const pad = (4 - ((p + 1) % 4)) % 4;
+        const def = p + 1 + pad;
+        if (def + 12 <= bc.length) {
+          const dflt = bc.readInt32LE(def);
+          const lo = bc.readInt32LE(def + 4), hi = bc.readInt32LE(def + 8);
+          addSuccessor(p + dflt, depth, pending);
+          for (let k = 0; k <= hi - lo && def + 12 + (k + 1) * 4 <= bc.length; k++) {
+            addSuccessor(p + bc.readInt32LE(def + 12 + k * 4), depth, pending);
+          }
+        }
+        return;
+      }
+      if (op === 0xab) { // lookupswitch
+        depth += stackDelta(op, bc, p);
+        if (depth < 0) depth = 0;
+        prune();
+        const pad = (4 - ((p + 1) % 4)) % 4;
+        const def = p + 1 + pad;
+        if (def + 8 <= bc.length) {
+          const dflt = bc.readInt32LE(def);
+          const npairs = bc.readInt32LE(def + 4);
+          addSuccessor(p + dflt, depth, pending);
+          for (let k = 0; k < npairs && def + 8 + k * 8 + 8 <= bc.length; k++) {
+            addSuccessor(p + bc.readInt32LE(def + 8 + k * 8 + 4), depth, pending);
+          }
+        }
+        return;
+      }
+
+      // Default: other instructions
       depth += stackDelta(op, bc, p);
       if (depth < 0) depth = 0;
-      p += len; prune();
+      prune();
+      addSuccessor(p + len, depth, pending);
+    };
+
+    while (queue.length > 0) {
+      processOffset(queue.shift());
+    }
+
+    // Sweep any unvisited instructions to ensure no unreachable code is missed
+    for (let p2 = 0; p2 < bc.length; p2 += Math.max(1, instrLen(bc, p2))) {
+      if (!stateAt.has(p2)) {
+        addSuccessor(p2, 0, []);
+        while (queue.length > 0) {
+          processOffset(queue.shift());
+        }
+      }
     }
   }
   return kinds;
