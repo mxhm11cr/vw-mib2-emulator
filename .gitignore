@@ -11,5 +11,7 @@ node_modules/
 *.exe
 firmware/*.7z
 firmware/*.part
+firmware/*.img
+firmware/MST2_EU_VW_PQ_P0475T_IMG_CP_OFF_SWAP/
 test-output.log
 .qwen/

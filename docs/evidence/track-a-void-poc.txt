@@ -1,11 +1,11 @@
 # Track A A2 — authentic firmware java.lang.Void executes on JDK 21
-# Date: 2026-11-13T07:42:57.114Z
+# Date: 2026-11-13T09:05:27.479Z
 # Source: J9 2.3 ROM class (tsd.mibstd2.hmi.v2.jxe / rom.classes), unmodified firmware bytecode
 # Converter: src/track-a/jxe/rom-to-class.js (independent implementation, empirically derived format)
 # Execution: JDK 21 --patch-module java.base replaces the JDK Void with the converted firmware Void
 # Test harness: src/track-a/poc/TestConvertedVoid.java (our code; executed class is authentic)
 
-java/lang/Void: romSize=584 methods=2 fields=2 cp=35 shapes={"Class":10,"Ref":10,"String":3,"NameAndType":10,"Unknown":2}
+java/lang/Void: romSize=584 methods=2 fields=2 cp=32 shapes={"Class":10,"Ref":10,"String":3,"NameAndType":9}
   <clinit>()V mods=0x20008 stack=3 locals=2 bc=63B
   <init>()V mods=0x2002 stack=1 locals=1 bc=5B
 

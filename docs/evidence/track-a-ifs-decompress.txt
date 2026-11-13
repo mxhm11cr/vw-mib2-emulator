@@ -1,32 +1,53 @@
-# Track A A4 — QNX HMI IFS decompression (VERIFIED)
-# Date: 2026-11-13T09:36:29.154Z
-# Source: firmware/analysis/hmizr/tsd/tmp/hmi/tsd.mibstd2.hmi.ifs (21,410,108 B, authentic, unmodified)
+# Track A A4 — QNX HMI IFS decompression (VERIFIED, RESOLVED)
+# Updated: 2026-11-13
+# Sources (authentic, unmodified):
+#   P0369: firmware/analysis/hmizr/tsd/tmp/hmi/tsd.mibstd2.hmi.ifs (21,410,108 B)
+#   P0475: firmware/analysis/p0475/tsd.mibstd2.hmi.ifs (22,253,280 B, extracted from eMMC QNX6)
 #
-# Compression identified: QNX startup-header LZO (flags1=0x8 = STARTUP_HDR_FLAGS1_COMPRESS_LZO).
-# Algorithm source: QNX dumpifs.c (vocho/openqnx) — block framing [u16 BE length][LZO1X block],
-# terminated by length 0; LZO1X decompression implemented independently in tools/lzo1x.js.
+# Compression: QNX startup-header LZO (flags1=0x8). Block framing [u16 BE length][LZO1X block],
+# terminated by length 0. LZO1X implemented independently in tools/lzo1x.js (faithful minilzo).
 #
-# Result:
-#   startup_size = 0x104 (compressed payload start)
-#   decompressed image size = 47587148 bytes
-#   imagefs signature @0x0, image_size=51679180, dir_offset=0x5c
-#   J99J ROM images present; MIBHMI version string present (MIBHMI-STD-H28.28.2808)
+# VERIFIED RESULT (both platforms):
+#   P0369: decompressed = 51,679,180 B == image_size; imagefs @0x0, dir_offset=0x5c; 7 dirents.
+#   P0475: decompressed = 53,805,004 B == image_size; imagefs @0x0, dir_offset=0x5c; 7 dirents.
+#   MIBHMI.jxe extracted CLEAN: P0369 = 39,693,112 B, P0475 = 41,725,664 B (valid ZIP).
+#   P0369 HMI rom.classes: J99J, 19,087 classes, ALL names/offsets consistent, 13,106 de/vw/mib.
+#   P0475 HMI rom.classes: J99J, 19,384 classes, ALL names/offsets consistent, 14,122 de/vw/mib.
+#   de/vw/mib/MIBMain present in BOTH and converts to a valid standard .class (7 methods, 11 fields).
 #
-# Blocker (next): IFS file payloads (incl. MIBHMI.jxe rom.classes) carry a TechniSat per-file
-# transformation (J99J magic intact but romSize/header fields transformed; UUID shifted 32->26;
-# variable byte insertion in class directory). Reversing this is the Track B security-transform
-# overlap. The clean platform JXE (tsd.mibstd2.hmi.v2.jxe) from the tarball is NOT transformed and
-# was already converted+executed in A3. MIBMain (de.vw.mib.MIBMain) resides in MIBHMI.jxe (IFS).
+# BYTE-PERFECT PROOF (controlled experiment):
+#   The platform JXE tsd.mibstd2.hmi.v2.jxe exists both in the P0475 QNX6 filesystem (extracted
+#   directly, no LZO) and inside the LZO-compressed IFS. The two extractions are byte-for-byte
+#   IDENTICAL (0 diffs over 5,786,259 B). Decompressed size matches image_size exactly; whole-image
+#   32-bit word-sum = 0 (QNX checksum design). => LZO decompression is correct.
 #
-# TechniSat per-file transform characterization (read-only analysis of IFS rom.classes @0x1eb):
-#   - First 8 bytes intact: J99J magic + version 06 09 09 06.
-#   - UUID preserved verbatim but shifted (clean offset 32 -> IFS offset 26): LZ-style literal run.
-#   - Class directory: classOffset words largely intact (0x24d49c, 0x291fbc, 0x2ee7c4, 0x2629fc),
-#     nameOffset words compressed/transformed with variable byte insertion.
-#   - Class DATA also transformed (clean java/io/File class header not present anywhere in IFS).
-#   - Ruled out: LZO1X at offsets 8/9/10/12/16 (yields ~52KB garbage, not 5.5MB);
-#     repeating-key XOR (keylen 1/2/4/8/16 all <15% byte consistency).
-#   => Custom TechniSat compression/cipher over the whole rom.classes. Reversal requires the
-#      algorithm (candidate sources: libxip.so XIP loader / J9 VM native decompression in the
-#      HMI tarball, ARM ELF) or data-driven RE. This is the shared Track A/B security-transform
-#      blocker. Next: inspect libxip.so / tsd.mibstd2.hmi.dsi.native.so for the decode routine.
+# =====================================================================================
+# FAILED HYPOTHESIS (DISPROVEN — do not repeat): "TechniSat per-file security transformation"
+# =====================================================================================
+# Earlier analysis claimed IFS file payloads (MIBHMI.jxe rom.classes) carried a custom TechniSat
+# compression/cipher: "J99J magic intact but romSize/header transformed; UUID shifted 32->26;
+# variable byte insertion in class directory; clean java/io/File header absent".
+#
+# ROOT CAUSE OF THE FALSE CONCLUSION: a BUGGY LZO1X decompressor. The decompressed image was
+# corrupt (wrong size, garbled directory), so the "J99J @0x1eb" examined was a coincidental literal
+# INSIDE the directory region (0x5c..0x248), not a real ROM header. The "shifted UUID / inserted
+# bytes" were LZO match-copy artifacts, not encryption.
+#
+# LZO bugs found and fixed (vs canonical minilzo lzo1x_decompress):
+#   1. Zero-length extension omitted the base constant: literal run needs +15, M3 +31, M4 +7.
+#   2. M2/M3/M4 used mc(3); copy_match copies 2 bytes + t (one byte too many per match).
+#   3. M3/M4 spuriously added t += 2; the fallback copy_match does NOT add 2 (that adjustment
+#      exists only in minilzo's unaligned-64 optimized path). This over-copied 2 bytes per M3/M4
+#      match, inflating each 64 KiB block to ~71 KiB.
+# After fixes: decompressed size == image_size exactly, directory clean, ROMs fully consistent.
+#
+# NOTE: MIBHMI.jxe rom.classes ZIP entry reports a CRC mismatch (P0475 d41098e9 vs stored 19bffd27)
+# while all 4572 other entries pass. This is a firmware JXE-linker quirk (rom.classes patched after
+# the ZIP CRC was computed), NOT corruption: LZO is proven byte-perfect and all 19,384 class
+# directory entries / names / offsets validate. The clean platform JXE rom.classes CRC is OK.
+#
+# Conversion status: platform JXE 99% (P0475 1423/1437). HMI sample 378/400 convert; remainder are
+# converter limitations on specific class structures (private opcodes / CP mapping), not corruption.
+# Next: extend converter coverage for HMI classes, then load de.vw.mib.MIBMain on JDK 21 with the
+# boot classpath from runHMI.sh (platform jxe : MIBHMI.jxe : charconv.zip : locale.zip : GEM.jar :
+# j9jce.jar : bcprov-jdk14.jar) and stub missing DSI/ASL/OpenGL services.

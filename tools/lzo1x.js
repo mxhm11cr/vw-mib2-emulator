@@ -10,67 +10,72 @@ export function lzo1xDecompress(input) {
   let t = 0;
   let mpos = 0;
   const lit = (n) => { for (let i = 0; i < n; i++) out.push(input[ip++]); };
-  const match = (n) => { for (let i = 0; i < n; i++) out.push(out[mpos + i]); mpos += n; };
+  const mc = (n) => { for (let i = 0; i < n; i++) out.push(out[mpos++]); };
+  // minilzo zero-length extension: t += 255 per zero byte, then base + next byte.
+  // base differs by context: literal run = 15, M3 = 31, M4 = 7.
+  const extend = (base) => { while (input[ip] === 0) { t += 255; ip++; } t += base + input[ip++]; };
+  // copy_match: 2 bytes then t more (t >= 1), overlap-safe.
+  const copyMatch = () => { mc(2); while (t-- > 0) out.push(out[mpos++]); };
 
-  // initial literal run
-  if (input[ip] > 17) {
-    t = input[ip++] - 17;
-    if (t >= 4) {
-      lit(t);
-      t = input[ip++];
-      if (t < 16) {
-        mpos = out.length - 1 - 0x800 - (t >> 2) - (input[ip++] << 2);
-        match(3);
-        t = input[ip - 2] & 3;
-        if (t) lit(t);
-      } else {
-        ip--; // re-read as match token in main loop
-      }
-    } else {
-      lit(t);
-    }
-  }
-
+  // Faithful minilzo lzo1x_decompress control flow (init/main/first_literal_run/match/
+  // match_done/match_next). Post-match trailing literals route to `match` (M1-capable).
+  let state = 'init';
   while (ip < ipEnd) {
-    t = input[ip++];
-    if (t < 16) {
-      if (t === 0) { while (input[ip] === 0) { t += 255; ip++; } t += input[ip++]; }
-      lit(t + 3);
-      t = input[ip++];
-      if (t < 16) {
-        mpos = out.length - 1 - 0x800 - (t >> 2) - (input[ip++] << 2);
-        match(3);
-        t = input[ip - 2] & 3;
-        if (t) lit(t);
-        continue;
+    if (state === 'init') {
+      if (input[ip] > 17) {
+        t = input[ip++] - 17;
+        if (t < 4) { state = 'match_next'; continue; }
+        lit(t);
+        state = 'first_literal_run'; continue;
       }
+      state = 'main'; continue;
     }
-    // match
-    if (t >= 64) {
-      mpos = out.length - 1 - ((t >> 2) & 7) - (input[ip++] << 3);
-      t = (t >> 5) - 1;
-      match(3); while (t-- > 0) out.push(out[mpos++]);
-    } else if (t >= 32) {
-      t &= 31;
-      if (t === 0) { while (input[ip] === 0) { t += 255; ip++; } t += input[ip++]; }
-      mpos = out.length - 1 - ((input[ip] >> 2) | (input[ip + 1] << 6));
-      ip += 2; t += 2;
-      match(3); while (t-- > 0) out.push(out[mpos++]);
-    } else if (t >= 16) {
-      mpos = out.length - ((t & 8) << 11);
-      t &= 7;
-      if (t === 0) { while (input[ip] === 0) { t += 255; ip++; } t += input[ip++]; }
-      mpos -= ((input[ip] >> 2) | (input[ip + 1] << 6));
-      ip += 2;
-      if (mpos === out.length) break; // EOF marker
-      mpos -= 0x4000; t += 2;
-      match(3); while (t-- > 0) out.push(out[mpos++]);
-    } else {
-      mpos = out.length - 1 - (t >> 2) - (input[ip++] << 2);
-      match(2);
+    if (state === 'main') {
+      t = input[ip++];
+      if (t >= 16) { state = 'match'; continue; }
+      if (t === 0) extend(15);
+      lit(t + 3);
+      state = 'first_literal_run'; continue;
     }
-    t = input[ip - 2] & 3;
-    if (t) lit(t);
+    if (state === 'first_literal_run') {
+      t = input[ip++];
+      if (t >= 16) { state = 'match'; continue; }
+      mpos = out.length - 1 - 0x800 - (t >> 2) - (input[ip++] << 2);
+      mc(3);
+      state = 'match_done'; continue;
+    }
+    if (state === 'match') {
+      if (t >= 64) {
+        mpos = out.length - 1 - ((t >> 2) & 7) - (input[ip++] << 3);
+        t = (t >> 5) - 1;
+        copyMatch();
+      } else if (t >= 32) {
+        t &= 31; if (t === 0) extend(31);
+        mpos = out.length - 1 - ((input[ip] >> 2) + (input[ip + 1] << 6)); ip += 2;
+        copyMatch();
+      } else if (t >= 16) {
+        mpos = out.length - ((t & 8) << 11);
+        t &= 7; if (t === 0) extend(7);
+        mpos -= ((input[ip] >> 2) + (input[ip + 1] << 6)); ip += 2;
+        if (mpos === out.length) break; // EOF marker
+        mpos -= 0x4000;
+        copyMatch();
+      } else {
+        mpos = out.length - 1 - (t >> 2) - (input[ip++] << 2);
+        mc(2);
+      }
+      state = 'match_done'; continue;
+    }
+    if (state === 'match_done') {
+      t = input[ip - 2] & 3;
+      if (t === 0) { state = 'main'; continue; }
+      state = 'match_next'; continue;
+    }
+    if (state === 'match_next') {
+      lit(t);
+      t = input[ip++];
+      state = 'match'; continue;
+    }
   }
   return Buffer.from(out);
 }
