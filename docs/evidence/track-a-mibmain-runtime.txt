@@ -1,0 +1,39 @@
+# Track A A4 — authentic VW HMI startup on JDK 21 (runtime frontier)
+# Date: 2026-11-13T11:32:47.513Z
+# Source: de.vw.mib.MIBMain (P0369 MIBHMI.jxe), authentic config from P0475 QNX6 /tsd/hmi/HMI/config.
+# Classpath: 18511 converted HMI+platform classes. JVM: JDK 21, -noverify (per runHMI.sh).
+# Working dir: firmware/analysis/p0369/runtime ; system properties mirror runHMI.sh.
+#
+# Verified executing: MIBMain.main -> Log4MIB (structured logging) -> MIBOsgi container ->
+# bundles.properties loaded -> startSPIBundles -> BundleWatchdog running.
+# Execution frontier: native DSI SPI library (ARM QNX .so) — Track A adapter boundary
+#
+# Sampled output (12s):
+Java HotSpot(TM) 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated in JDK 13 and will likely be removed in a future release.
+LOADED: de.vw.mib.MIBMain
+super: java.lang.Object
+interfaces: [interface de.vw.mib.log4mib.classifier.StartupClassifier]
+modifiers: 0x11
+declaredFields: 11
+declaredMethods: 6
+main method resolved: public static void de.vw.mib.MIBMain.main(java.lang.String[])
+invoking main() ...
+main() returned
+[Log4MIB] Initializing Log4MIB - queue capacity: 2000
+[Log4MIB] logging thread started - 157988581
+6   INFO [0x4000, 0x1, 0xf272cf50] Launching MIB ...
+8   INFO [0x4000, 0x1, 0xf272cf50] Starting HMI with startup order: TARGET
+10   INFO [0x4000, 0x2, 0xf272cf50] Starting SPI bundles ...
+	at java.base/java.lang.ClassLoader.loadLibrary(ClassLoader.java:2458)
+	at java.base/java.lang.Runtime.loadLibrary0(Runtime.java:916)
+	at java.base/java.lang.System.loadLibrary(System.java:2064)
+	at tsd.mibstd2.hmi.spi.NativeSPILibraryLoader.load(Unknown Source)
+	at tsd.mibstd2.hmi.spi.DefaultSPIActivator.start(Unknown Source)
+	at de.vw.mib.osgi.internal.BundleInfo.start(Unknown Source)
+	at de.vw.mib.osgi.internal.MIBOsgiImpl.startBundle(Unknown Source)
+	at de.vw.mib.osgi.internal.MIBOsgiImpl.performBundleStarts(Unknown Source)
+	at de.vw.mib.osgi.internal.MIBOsgiImpl.startSPIBundles(Unknown Source)
+	at de.vw.mib.MIBMain.start(Unknown Source)
+	at de.vw.mib.MIBMain$1.run(Unknown Source)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+

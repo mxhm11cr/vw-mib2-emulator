@@ -44,3 +44,27 @@ function interfaceNames(bytes) {
   const { bytes } = convertClass(b, 'de/vw/mib/util/Util', img);
   assert.equal(bytes.readUInt32BE(0), 0xcafebabe);
 });
+
+// Count CP entries of a given tag in a converted class file.
+function cpTagCount(bytes, wantTag) {
+  let p = 8; const count = bytes.readUInt16BE(p); p += 2; let n = 0;
+  for (let i = 1; i < count; i++) {
+    const tag = bytes[p]; p++;
+    if (tag === wantTag) n++;
+    if (tag === 1) p += 2 + bytes.readUInt16BE(p);
+    else if (tag === 5 || tag === 6) { p += 8; i++; }
+    else if (tag === 7 || tag === 8 || tag === 16 || tag === 19 || tag === 20) p += 2;
+    else if (tag === 15) p += 3;
+    else p += 4;
+  }
+  return n;
+}
+
+(haveRom ? test : test.skip)('firmware interface method refs are InterfaceMethodref (tag 11)', () => {
+  const b = readFileSync(romPath);
+  const img = parseRomImage(b);
+  // ByteArrayCodec.decode calls ByteArrayDecoder.readHeader (a firmware interface). The ref
+  // must be tagged 11, not 10, or invokeinterface throws IncompatibleClassChangeError at runtime.
+  const { bytes } = convertClass(b, 'de/vw/mib/codec/ByteArrayCodec', img);
+  assert.ok(cpTagCount(bytes, 11) >= 1, 'expected >=1 InterfaceMethodref CP entries');
+});

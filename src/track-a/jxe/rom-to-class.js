@@ -99,7 +99,7 @@ class CPBuilder {
   }
 }
 
-export function buildStandardCP(items) {
+export function buildStandardCP(items, ifaceRefIdx = null, ifaces = null) {
   const cp = new CPBuilder();
   const j9ToStd = [];
   for (let i = 0; i < items.length; i++) {
@@ -125,7 +125,13 @@ export function buildStandardCP(items) {
     // is NOT on the 8-byte CP grid (the 12-byte field table shifts its alignment by
     // numFields*12 mod 8), so grid-index lookup of natOff fails; use the parsed name/desc.
     const natStd = cp.nat(it.natName, it.natDesc);
-    const tag = it.natDesc.startsWith('(') ? 10 : 9;
+    // invokeinterface (0xb9/0xe7) requires an InterfaceMethodref (tag 11), not Methodref (10).
+    // Two signals: target class is a known interface (ROM metadata; reliable for firmware
+    // interfaces), or the ref is used by an invokeinterface opcode (covers JDK interfaces).
+    const targetClass = items[it.classIndex - 1];
+    const targetIsIface = ifaces && targetClass && targetClass.shape === 'Class' && ifaces.has(targetClass.name);
+    const isIface = it.natDesc.startsWith('(') && (targetIsIface || (ifaceRefIdx && ifaceRefIdx.has(i + 1)));
+    const tag = it.natDesc.startsWith('(') ? (isIface ? 11 : 10) : 9;
     j9ToStd[i + 1] = cp.ref(tag, classStd, natStd);
   }
   const indexMap = new Map();
@@ -513,7 +519,26 @@ export function convertClass(b, target, img = parseRomImage(b)) {
   const shapes = {};
   for (const it of items) shapes[it.shape] = (shapes[it.shape] || 0) + 1;
   lines.push(`${target}: romSize=${h.romSize} methods=${raw[7]} fields=${raw[9]} cp=${items.length} shapes=${JSON.stringify(shapes)}`);
-  const { cp, indexMap } = buildStandardCP(items);
+  // Collect J9 CP indices used by invokeinterface (0xe7 quick / 0xb9) so those refs are
+  // emitted as InterfaceMethodref. Scanning the opcode usage works even for JDK interfaces
+  // (e.g. java/util/Set) that are not present in the firmware ROM.
+  const ifaceRefIdx = new Set();
+  for (let i = 0; i < mStarts.length; i++) {
+    const bcWords = b.readUInt16LE(base + mStarts[i] + 14);
+    if (bcWords === 0) continue;
+    const bcStart = base + mStarts[i] + 20;
+    const bcEnd = i + 1 < mStarts.length ? base + mStarts[i + 1] : base + h.romSize;
+    const bc = b.subarray(bcStart, Math.min(bcStart + bcWords * 4, bcEnd));
+    for (let p = 0; p < bc.length;) {
+      const op = bc[p];
+      if (op === 0xe7 && p + 5 <= bc.length) ifaceRefIdx.add(bc.readUInt16LE(p + 3));
+      else if (op === 0xb9 && p + 5 <= bc.length) ifaceRefIdx.add(bc.readUInt16LE(p + 1));
+      const len = instrLen(bc, p);
+      p += len > 0 ? len : 1;
+    }
+  }
+  if (!img._ifaces) img._ifaces = new Set(img.classes.filter((c) => (c.header.raw[4] & 0x0200) !== 0).map((c) => c.name));
+  const { cp, indexMap } = buildStandardCP(items, ifaceRefIdx, img._ifaces);
   const refDesc = new Map();
   items.forEach((it, i) => { if (it.shape === 'Ref') refDesc.set(i + 1, it.natDesc); });
   const methods = [];

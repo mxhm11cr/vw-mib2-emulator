@@ -2,6 +2,7 @@
 // On-disk layout per Linux include/linux/qnx6_fs.h, fs/qnx6/{inode,dir}.c.
 // No writes to the image. Block cache keeps indirect-block reads cheap.
 import { openSync, readSync, closeSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 
 const QNX6_MAGIC = 0x68191122;
 const INODE_SIZE = 0x80;
@@ -198,6 +199,31 @@ if (process.argv[1] && process.argv[1].endsWith('qnx6.js')) {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(rest[1], data);
     console.log(`extracted ${data.length} bytes -> ${rest[1]}`);
+  } else if (cmd === 'getdir') {
+    const node = resolve(rest[0]);
+    if (!node || node.type !== S_IFDIR) { console.log('not a dir:', rest[0]); process.exit(1); }
+    const outBase = rest[1];
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+    let count = 0, bytes = 0;
+    const walk = (n, rel, depth) => {
+      if (depth > 16) return;
+      for (const e of fs.readDir(n)) {
+        if (e.name === '.' || e.name === '..') continue;
+        const c = fs.readInode(e.ino);
+        if (!c) continue;
+        const full = rel ? rel + '/' + e.name : e.name;
+        if (c.type === S_IFDIR) walk(c, full, depth + 1);
+        else if (c.type === S_IFREG) {
+          const data = fs.fileData(c, 512 * 1024 * 1024);
+          const p = join(outBase, full);
+          mkdirSync(dirname(p), { recursive: true });
+          writeFileSync(p, data);
+          count++; bytes += data.length;
+        }
+      }
+    };
+    walk(node, '', 0);
+    console.log(`extracted ${count} files (${bytes} bytes) -> ${outBase}`);
   }
   fs.close();
 }
