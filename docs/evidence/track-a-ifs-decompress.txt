@@ -17,3 +17,16 @@
 # variable byte insertion in class directory). Reversing this is the Track B security-transform
 # overlap. The clean platform JXE (tsd.mibstd2.hmi.v2.jxe) from the tarball is NOT transformed and
 # was already converted+executed in A3. MIBMain (de.vw.mib.MIBMain) resides in MIBHMI.jxe (IFS).
+#
+# TechniSat per-file transform characterization (read-only analysis of IFS rom.classes @0x1eb):
+#   - First 8 bytes intact: J99J magic + version 06 09 09 06.
+#   - UUID preserved verbatim but shifted (clean offset 32 -> IFS offset 26): LZ-style literal run.
+#   - Class directory: classOffset words largely intact (0x24d49c, 0x291fbc, 0x2ee7c4, 0x2629fc),
+#     nameOffset words compressed/transformed with variable byte insertion.
+#   - Class DATA also transformed (clean java/io/File class header not present anywhere in IFS).
+#   - Ruled out: LZO1X at offsets 8/9/10/12/16 (yields ~52KB garbage, not 5.5MB);
+#     repeating-key XOR (keylen 1/2/4/8/16 all <15% byte consistency).
+#   => Custom TechniSat compression/cipher over the whole rom.classes. Reversal requires the
+#      algorithm (candidate sources: libxip.so XIP loader / J9 VM native decompression in the
+#      HMI tarball, ARM ELF) or data-driven RE. This is the shared Track A/B security-transform
+#      blocker. Next: inspect libxip.so / tsd.mibstd2.hmi.dsi.native.so for the decode routine.
