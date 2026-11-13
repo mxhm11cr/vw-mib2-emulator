@@ -9,3 +9,7 @@ firmware/research/*.pdf
 firmware/research/*.txt
 node_modules/
 *.exe
+firmware/*.7z
+firmware/*.part
+test-output.log
+.qwen/
