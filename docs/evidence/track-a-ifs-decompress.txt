@@ -1,0 +1,19 @@
+# Track A A4 — QNX HMI IFS decompression (VERIFIED)
+# Date: 2026-11-13T09:36:29.154Z
+# Source: firmware/analysis/hmizr/tsd/tmp/hmi/tsd.mibstd2.hmi.ifs (21,410,108 B, authentic, unmodified)
+#
+# Compression identified: QNX startup-header LZO (flags1=0x8 = STARTUP_HDR_FLAGS1_COMPRESS_LZO).
+# Algorithm source: QNX dumpifs.c (vocho/openqnx) — block framing [u16 BE length][LZO1X block],
+# terminated by length 0; LZO1X decompression implemented independently in tools/lzo1x.js.
+#
+# Result:
+#   startup_size = 0x104 (compressed payload start)
+#   decompressed image size = 47587148 bytes
+#   imagefs signature @0x0, image_size=51679180, dir_offset=0x5c
+#   J99J ROM images present; MIBHMI version string present (MIBHMI-STD-H28.28.2808)
+#
+# Blocker (next): IFS file payloads (incl. MIBHMI.jxe rom.classes) carry a TechniSat per-file
+# transformation (J99J magic intact but romSize/header fields transformed; UUID shifted 32->26;
+# variable byte insertion in class directory). Reversing this is the Track B security-transform
+# overlap. The clean platform JXE (tsd.mibstd2.hmi.v2.jxe) from the tarball is NOT transformed and
+# was already converted+executed in A3. MIBMain (de.vw.mib.MIBMain) resides in MIBHMI.jxe (IFS).

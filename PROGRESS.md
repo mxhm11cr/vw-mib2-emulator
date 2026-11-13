@@ -17,7 +17,7 @@ Two complementary tracks (effort ≈ 70% A / 30% B):
 | A1: authentic GEM bytecode executes on JDK 21 | **Verified 2026-11-13** | docs/evidence/track-a-gem-poc.txt; `npm run track-a:poc` |
 | A2: J9 ROM → .class converter (single class) | **Verified 2026-11-13** | authentic java/lang/Void converted + executed on JDK 21 (Void.TYPE==void.class); docs/evidence/track-a-void-poc.txt; `npm run track-a:void`; tests 14/14 |
 | A3: full platform JXE batch conversion + JVM verification + behavioral execution | **Verified 2026-11-13** | 1422/1436 converted (99%); 747 classes JVM-verify (99.7% of non-java.*), all 41 de.vw HMI classes verify; authentic IntObjectOptHashMap executes (put/get/remove/clear/growth); platform.jar; tests 17/17 |
-| A4: MIBHMI.jxe extracted from HMI IFS + converted | Pending | IFS is plain QNX (machine=0); imagefs dirent decode pending |
+| A4: MIBHMI.jxe extracted from HMI IFS + converted | In progress — IFS LZO decompression VERIFIED; MIBHMI.jxe payload transformation pending | Cracked QNX startup LZO compression (flags1=0x8): independent LZO1X (tools/lzo1x.js) + IFS extractor (tools/ifs-extract.js) decompress the 21.4MB IFS to 47.6MB; imagefs dir_offset=0x5c recovered (docs/evidence/track-a-ifs-decompress.txt). MIBMain confirmed NOT in platform JXE — it is in MIBHMI.jxe inside the IFS. IFS file payloads carry a TechniSat per-file transformation (J99J intact, header fields transformed) — reversal is the Track B security-transform overlap. |
 | A5: JSR-231 GL adapter renders authentic view | Pending | |
 | A6: DSI simulation + authentic main menu + input | Pending | |
 
@@ -67,3 +67,6 @@ Two complementary tracks (effort ≈ 70% A / 30% B):
   constants, J9 quick opcodes 0xD7/0xE7/0xF9, synthetic field flag. Reproducible platform.jar.
   Known limits: 14 classes (6 IBM text utilities w/ J9 quick opcodes 0xD5/0xEE, 8 CP edge cases);
   2 verify failures (swapped field name/desc in constant-heavy DSI/GLInfo classes). Tests 17/17.
+  **A4 progress — QNX HMI IFS LZO decompression cracked** (independent LZO1X, verified vs QNX
+  dumpifs.c framing): 21.4MB IFS → 47.6MB imagefs, real dir_offset=0x5c recovered. MIBMain is in
+  MIBHMI.jxe (IFS); IFS payloads are TechniSat-transformed (next: reverse per-file transform).
