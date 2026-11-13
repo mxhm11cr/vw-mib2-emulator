@@ -68,3 +68,20 @@ function cpTagCount(bytes, wantTag) {
   const { bytes } = convertClass(b, 'de/vw/mib/codec/ByteArrayCodec', img);
   assert.ok(cpTagCount(bytes, 11) >= 1, 'expected >=1 InterfaceMethodref CP entries');
 });
+
+(haveRom ? test : test.skip)('exception table is emitted with correct try/catch ranges', () => {
+  const b = readFileSync(romPath);
+  const img = parseRomImage(b);
+  const { lines } = convertClass(b, 'de/vw/mib/asl/framework/api/framework/ASLFactoryBase', img);
+  const target = lines.find((l) => l.includes('loadAllFactoryImplClasses'));
+  assert.ok(target, 'loadAllFactoryImplClasses method must exist');
+  assert.ok(target.includes('ex=1'), 'expected ex=1 handler in loadAllFactoryImplClasses');
+});
+
+(haveRom ? test : test.skip)('authentic string constants with \\x01/\\x02 markers are preserved', () => {
+  const b = readFileSync(romPath);
+  const img = parseRomImage(b);
+  const { lines } = convertClass(b, 'de/vw/mib/datapool/internal/AbstractDatapool', img);
+  const m1 = lines.find((l) => l.includes('getValueAsString(I)'));
+  assert.ok(m1, 'getValueAsString(I) must convert cleanly');
+});

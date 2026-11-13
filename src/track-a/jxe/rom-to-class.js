@@ -41,7 +41,7 @@ export function parseCP(b, classOff, cpStartRel, cpEndRel, fieldStart = -1, fiel
         const len = b.readUInt16LE(tgt);
         if (len <= 4096 && tgt + 2 + len <= b.length) nm = b.toString('latin1', tgt + 2, tgt + 2 + len);
       }
-      if (nm !== null && !/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(nm)) items.push({ shape: 'String', name: nm, off });
+      if (nm !== null && !/[\x00\x03-\x08\x0b\x0c\x0e-\x1f]/.test(nm)) items.push({ shape: 'String', name: nm, off });
       else items.push({ shape: 'Unknown', s1, s2, off });
     }
     else if (s1 > 0 && s1 < 4096) {
@@ -61,7 +61,12 @@ export function parseCP(b, classOff, cpStartRel, cpEndRel, fieldStart = -1, fiel
 }
 
 class CPBuilder {
-  constructor() { this.entries = [null]; this.map = new Map(); }
+  constructor() {
+    this.entries = [null];
+    this.map = new Map();
+    this.utf8Map = new Map();
+    this.utf8List = [];
+  }
   add(tag, key) {
     if (key && this.map.has(key)) return this.map.get(key);
     const idx = this.entries.length;
@@ -69,16 +74,86 @@ class CPBuilder {
     if (key) this.map.set(key, idx);
     return idx;
   }
-  utf8(s) { const i = this.add(1, 'u:' + s); this.entries[i].bytes = Buffer.from(s, 'latin1'); return i; }
-  clazz(name) { const i = this.add(7, 'c:' + name); this.entries[i].nameIdx = this.utf8(name); return i; }
-  string(s) { const i = this.add(8, 's:' + s); this.entries[i].utfIdx = this.utf8(s); return i; }
-  nat(name, desc) { const i = this.add(12, 'nt:' + name + ':' + desc); this.entries[i].nameIdx = this.utf8(name); this.entries[i].descIdx = this.utf8(desc); return i; }
-  ref(tag, classIdx, natIdx) { const i = this.add(tag, `r:${tag}:${classIdx}:${natIdx}`); this.entries[i].classIdx = classIdx; this.entries[i].natIdx = natIdx; return i; }
+  getUtf8(s) {
+    if (this.utf8Map.has(s)) return this.utf8Map.get(s);
+    const ref = { s, idx: -1, valueOf() { return this.idx; } };
+    this.utf8Map.set(s, ref);
+    this.utf8List.push(ref);
+    return ref;
+  }
+  utf8(s) { return this.getUtf8(s); }
+  clazz(name) {
+    const k = 'c:' + name;
+    if (this.map.has(k)) return this.map.get(k);
+    const uRef = this.getUtf8(name);
+    const i = this.add(7, k);
+    this.entries[i].uRef = uRef;
+    return i;
+  }
+  string(s) {
+    const k = 's:' + s;
+    if (this.map.has(k)) return this.map.get(k);
+    const uRef = this.getUtf8(s);
+    const i = this.add(8, k);
+    this.entries[i].uRef = uRef;
+    return i;
+  }
+  nat(name, desc) {
+    const k = 'nt:' + name + ':' + desc;
+    if (this.map.has(k)) return this.map.get(k);
+    const nameRef = this.getUtf8(name);
+    const descRef = this.getUtf8(desc);
+    const i = this.add(12, k);
+    this.entries[i].nameRef = nameRef;
+    this.entries[i].descRef = descRef;
+    return i;
+  }
+  ref(tag, classIdx, natIdx) {
+    const k = `r:${tag}:${classIdx}:${natIdx}`;
+    if (this.map.has(k)) return this.map.get(k);
+    const i = this.add(tag, k);
+    this.entries[i].classIdx = classIdx;
+    this.entries[i].natIdx = natIdx;
+    return i;
+  }
   integer(v) { const i = this.add(3, 'i:' + v); this.entries[i].value = v | 0; return i; }
   float(bits) { const i = this.add(4, 'f:' + bits); this.entries[i].bits = bits >>> 0; return i; }
-  long(lo, hi) { const k = 'l:' + lo + ':' + hi; if (this.map.has(k)) return this.map.get(k); const i = this.add(5, k); this.entries[i].lo = lo >>> 0; this.entries[i].hi = hi >>> 0; this.entries.push(null); return i; } // 2 CP slots (only for new entries)
-  double(lo, hi) { const k = 'd:' + lo + ':' + hi; if (this.map.has(k)) return this.map.get(k); const i = this.add(6, k); this.entries[i].lo = lo >>> 0; this.entries[i].hi = hi >>> 0; this.entries.push(null); return i; }
+  long(lo, hi) {
+    const k = 'l:' + lo + ':' + hi;
+    if (this.map.has(k)) return this.map.get(k);
+    const i = this.add(5, k);
+    this.entries[i].lo = lo >>> 0;
+    this.entries[i].hi = hi >>> 0;
+    this.entries.push(null);
+    return i;
+  }
+  double(lo, hi) {
+    const k = 'd:' + lo + ':' + hi;
+    if (this.map.has(k)) return this.map.get(k);
+    const i = this.add(6, k);
+    this.entries[i].lo = lo >>> 0;
+    this.entries[i].hi = hi >>> 0;
+    this.entries.push(null);
+    return i;
+  }
+  finalizeUtf8() {
+    for (const u of this.utf8List) {
+      if (u.idx === -1) {
+        const i = this.entries.length;
+        this.entries.push({ tag: 1, bytes: Buffer.from(u.s, 'latin1') });
+        u.idx = i;
+      }
+    }
+    for (let i = 1; i < this.entries.length; i++) {
+      const e = this.entries[i];
+      if (!e) continue;
+      if (e.tag === 7) e.nameIdx = e.uRef.idx;
+      else if (e.tag === 8) e.utfIdx = e.uRef.idx;
+      else if (e.tag === 12) { e.nameIdx = e.nameRef.idx; e.descIdx = e.descRef.idx; }
+    }
+  }
   serialize() {
+    this.finalizeUtf8();
     const out = [];
     const u2 = (v) => { const x = Buffer.alloc(2); x.writeUInt16BE(v); return x; };
     const u4 = (v) => { const x = Buffer.alloc(4); x.writeUInt32BE(v >>> 0); return x; };
@@ -99,22 +174,38 @@ class CPBuilder {
   }
 }
 
-export function buildStandardCP(items, ifaceRefIdx = null, ifaces = null) {
+export function buildStandardCP(items, ifaceRefIdx = null, ifaces = null, ldc8 = null) {
   const cp = new CPBuilder();
   const j9ToStd = [];
+  // Pass 1: Allocate entries used by 0x12 (ldc) first so their standard CP indices are guaranteed <= 255.
+  if (ldc8) {
+    for (const j9Idx of ldc8) {
+      const it = items[j9Idx - 1];
+      if (!it) continue;
+      if (it.shape === 'Class') j9ToStd[j9Idx] = cp.clazz(it.name);
+      else if (it.shape === 'String') j9ToStd[j9Idx] = cp.string(it.name);
+      else if (it.shape === 'Constant') {
+        if (it.type === 'int') j9ToStd[j9Idx] = cp.integer(it.value);
+        else if (it.type === 'float') j9ToStd[j9Idx] = cp.float(it.bits);
+      }
+    }
+  }
+  // Pass 2: Allocate remaining constants and classes
   for (let i = 0; i < items.length; i++) {
+    const j9Idx = i + 1;
+    if (j9ToStd[j9Idx]) continue;
     const it = items[i];
-    if (it.shape === 'Class') j9ToStd[i + 1] = cp.clazz(it.name);
-    else if (it.shape === 'String') j9ToStd[i + 1] = cp.string(it.name);
+    if (it.shape === 'Class') j9ToStd[j9Idx] = cp.clazz(it.name);
+    else if (it.shape === 'String') j9ToStd[j9Idx] = cp.string(it.name);
     // NameAndType items from the grid walk are NOT added: the 12-byte field table shifts
     // the NAT section off the 8-byte CP grid, so grid-walked NATs are misaligned (name/desc
     // swapped). Correct NATs are created in pass 2 from each Ref's exact resolved natOff.
     else if (it.shape === 'Constant') {
-      if (it.type === 'int') j9ToStd[i + 1] = cp.integer(it.value);
-      else if (it.type === 'float') j9ToStd[i + 1] = cp.float(it.bits);
-      else if (it.type === 'long') j9ToStd[i + 1] = cp.long(it.lo, it.hi);
-      else if (it.type === 'double') j9ToStd[i + 1] = cp.double(it.lo, it.hi);
-    } else j9ToStd[i + 1] = null;
+      if (it.type === 'int') j9ToStd[j9Idx] = cp.integer(it.value);
+      else if (it.type === 'float') j9ToStd[j9Idx] = cp.float(it.bits);
+      else if (it.type === 'long') j9ToStd[j9Idx] = cp.long(it.lo, it.hi);
+      else if (it.type === 'double') j9ToStd[j9Idx] = cp.double(it.lo, it.hi);
+    } else j9ToStd[j9Idx] = null;
   }
   for (let i = 0; i < items.length; i++) {
     const it = items[i];
@@ -146,26 +237,15 @@ const LOAD = { 0x15: 1, 0x16: 2, 0x17: 1, 0x18: 2, 0x19: 1, 0x36: 1, 0x37: 2, 0x
 const LOAD_N = {}; // opcode -> [baseIndex, size]
 for (let k = 0; k < 4; k++) { LOAD_N[0x1a + k] = [k, 1]; LOAD_N[0x1e + k] = [k, 2]; LOAD_N[0x22 + k] = [k, 1]; LOAD_N[0x26 + k] = [k, 2]; LOAD_N[0x2a + k] = [k, 1]; LOAD_N[0x3b + k] = [k, 1]; LOAD_N[0x3f + k] = [k, 2]; LOAD_N[0x43 + k] = [k, 1]; LOAD_N[0x47 + k] = [k, 2]; LOAD_N[0x4b + k] = [k, 1]; }
 
-// J9 renumbers returns: 0xAC=return0(void), 0xAD=return1(1-word), 0xAE=return2(2-word).
-// Map to standard JVM return opcodes by the method's return type (empirically verified
-// across Void/Byte/Boolean/Object — see rom-probe11.js).
+// J9 renumbers returns (0xAC..0xB1). Standard JVM requires return opcodes to strictly match
+// the method's return type (JVM spec §6.5: return/ireturn/lreturn/freturn/dreturn/areturn).
 function mapReturn(op, ret) {
-  if (op === 0xac) return 0xb1; // return0 -> return (void)
-  if (op === 0xad) { // return1 (1-word)
-    if (ret === 'F') return 0xae; // freturn
-    if (ret === 'L' || ret === '[') return 0xb0; // areturn
-    return 0xac; // ireturn (I/B/S/Z/C)
-  }
-  if (op === 0xae) return ret === 'D' ? 0xaf : 0xad; // return2: dreturn / lreturn
-  if (op === 0xaf) { // returnFromJava: generic return, type-dispatched
-    if (ret === 'V') return 0xb1;
-    if (ret === 'J') return 0xad;
-    if (ret === 'D') return 0xaf;
-    if (ret === 'F') return 0xae;
-    if (ret === 'L' || ret === '[') return 0xb0;
-    return 0xac;
-  }
-  return op;
+  if (ret === 'V') return 0xb1; // return (void)
+  if (ret === 'J') return 0xad; // lreturn (long)
+  if (ret === 'D') return 0xaf; // dreturn (double)
+  if (ret === 'F') return 0xae; // freturn (float)
+  if (ret === 'L' || ret === '[') return 0xb0; // areturn (ref)
+  return 0xac; // ireturn (I, Z, B, C, S)
 }
 // J9 private single-byte opcodes verified against standard bytecode (rom-probe / javap):
 //   0xD7 = aload_0 variant (Throwable.initCause aligns 1:1 with standard).
@@ -188,7 +268,10 @@ export function convertBytecode(bc, indexMap, retType, refDesc) {
     const idx = wide ? out.readUInt16LE(p) : out[p];
     const m = indexMap.get(idx);
     if (m === undefined) throw new Error(`CP index ${idx} (op@${i}) not mapped`);
-    if (wide) out.writeUInt16BE(m, p); else out[p] = m;
+    if (wide) out.writeUInt16BE(m, p); else {
+      if (m > 255) throw new Error(`CP index ${m} exceeds 255 for single-byte ldc (op@${i})`);
+      out[p] = m;
+    }
   };
   const local = (idx, size) => { maxLocals = Math.max(maxLocals, idx + size); };
   while (i < out.length) {
@@ -216,21 +299,49 @@ export function convertBytecode(bc, indexMap, retType, refDesc) {
       }
       continue;
     }
-    if (op === 0xac || op === 0xad || op === 0xae || op === 0xaf) { out[i] = mapReturn(op, retType); i += 1; continue; }
-    // 0xB0 (areturn) and 0xB1 (return) are UNCHANGED standard opcodes in J9.
+    if (op >= 0xac && op <= 0xb1) { out[i] = mapReturn(op, retType); i += 1; continue; }
     if (J9_PRIVATE_1BYTE[op] !== undefined) { out[i] = J9_PRIVATE_1BYTE[op]; i += 1; continue; }
     if (op === 0xe7) { // J9 invokeinterfacequick: e7 00 b9 <idx16 LE> -> b9 <idx16 BE> <count> <0>
       const idx = out.readUInt16LE(i + 3);
       const m = indexMap.get(idx);
       if (m === undefined) throw new Error(`CP index ${idx} (invokeinterface@${i}) not mapped`);
-      const desc = refDesc ? refDesc.get(idx) : null;
+      const dObj = refDesc ? refDesc.get(idx) : null;
+      const desc = typeof dObj === 'string' ? dObj : (dObj ? dObj.natDesc : null);
       out[i] = 0xb9; out.writeUInt16BE(m, i + 1); out[i + 3] = desc ? paramSlots(desc, false) : 1; out[i + 4] = 0;
       i += 5; continue;
+    }
+    if (op === 0xd5) { // J9 wide iinc: d5 <local16 LE> <const16 LE> 00 -> c4 84 <local16 BE> <const16 BE>
+      const loc = out.readUInt16LE(i + 1);
+      const inc = out.readInt16LE(i + 3);
+      out[i] = 0xc4;
+      out[i + 1] = 0x84;
+      out.writeUInt16BE(loc, i + 2);
+      out.writeInt16BE(inc, i + 4);
+      local(loc, 1);
+      i += 6;
+      continue;
     }
     if (op >= 0xca && op <= 0xff && !CP16.has(op)) throw new Error(`J9 private opcode 0x${op.toString(16)} @${i} needs handling`);
     if (op === 0x12) { remap(i + 1, false); i += 2; continue; } // ldc
     if (op === 0xb9 || op === 0xba) { remap(i + 1, true); i += 5; continue; } // invokeinterface/invokedynamic
-    if (CP16.has(op)) { if (op === 0xf9) out[i] = 0x14; remap(i + 1, true); i += (op === 0xc5 ? 4 : 3); continue; }
+    if (CP16.has(op)) {
+      if (op === 0xf9) out[i] = 0x14;
+      if (op === 0xb7 && refDesc) {
+        const idx = out.readUInt16LE(i + 1);
+        const info = typeof refDesc.get === 'function' ? refDesc.get(idx) : null;
+        if (info) {
+          const natDesc = typeof info === 'string' ? info : info.natDesc;
+          const natName = info.natName || '';
+          const isObject = !!info.isObject;
+          if ((isObject && natName !== '<init>' && natName !== 'clone') ||
+              natName === 'wait' || natName === 'notify' || natName === 'notifyAll' || natName === 'getClass' ||
+              natDesc === '()Ljava/lang/Class;') {
+            out[i] = 0xb6; // invokespecial Object method -> invokevirtual
+          }
+        }
+      }
+      remap(i + 1, true); i += (op === 0xc5 ? 4 : 3); continue;
+    }
     if (op === 0xbc) { i += 2; continue; } // newarray (atype, not CP)
     if (BRANCH.has(op)) { sw16(i + 1); i += 3; continue; }
     if (op === 0x11) { sw16(i + 1); i += 3; continue; } // sipush
@@ -253,8 +364,8 @@ function instrLen(bc, p) {
     const pad = (4 - ((p + 1) % 4)) % 4;
     const def = p + 1 + pad;
     if (def + 8 > bc.length) return bc.length - p;
-    if (op === 0xaa) { const lo = bc.readInt32BE(def + 4), hi = bc.readInt32BE(def + 8); return def + 12 + (hi - lo + 1) * 4 - p; }
-    return def + 8 + bc.readInt32BE(def + 4) * 8 - p;
+    if (op === 0xaa) { const lo = bc.readInt32LE(def + 4), hi = bc.readInt32LE(def + 8); return def + 12 + (hi - lo + 1) * 4 - p; }
+    return def + 8 + bc.readInt32LE(def + 4) * 8 - p;
   }
   if (op === 0xb9 || op === 0xba) return 5;
   if (op === 0xc5) return 4;
@@ -262,6 +373,7 @@ function instrLen(bc, p) {
   if (CP16.has(op)) return 3;
   if (BRANCH.has(op)) return 3;
   if (op === 0xc8 || op === 0xc9) return 5;
+  if (op === 0xd5) return 6;
   if (op === 0xd7) return 1;
   if (op === 0xe7) return 5; // J9 invokeinterfacequick
   return 1 + (OP_LEN[op] || 0);
@@ -292,7 +404,7 @@ function stackDelta(op, bc, p) {
   if (op >= 0x60 && op <= 0x73) { const k = (op - 0x60) % 4; return (k === 1 || k === 3) ? -2 : -1; }
   if (op >= 0x74 && op <= 0x77) return 0;
   if (op >= 0x78 && op <= 0x83) return -1;
-  if (op === 0x84) return 0;
+  if (op === 0x84 || op === 0xd5) return 0;
   if (op >= 0x85 && op <= 0x93) { const push2 = [0x85, 0x87, 0x8c, 0x8d, 0x8f].includes(op); const pop2 = [0x88, 0x89, 0x8a, 0x8e, 0x8f, 0x90].includes(op); return (push2 ? 2 : 1) - (pop2 ? 2 : 1); }
   if (op === 0x94 || op === 0x97 || op === 0x98) return -3;
   if (op === 0x95 || op === 0x96) return -1;
@@ -372,6 +484,99 @@ function scanConstKinds(b, base, mStarts, romSize, items) {
         depth -= vw + (op === 0xb5 ? 1 : 0);
         p += len; prune(); continue;
       }
+      if (op === 0x62 || op === 0x66 || op === 0x6a || op === 0x6e || op === 0x72) { // fadd, fsub, fmul, fdiv, frem
+        resolve(pending, depth - 1, 1, 'float');
+        resolve(pending, depth - 2, 1, 'float');
+        depth -= 1; p += len; prune(); continue;
+      }
+      if (op === 0x76 || op === 0x8b || op === 0xae) { // fneg, f2i, freturn
+        resolve(pending, depth - 1, 1, 'float');
+        depth += op === 0xae ? -1 : 0; p += len; prune(); continue;
+      }
+      if (op === 0x8c || op === 0x8d) { // f2l, f2d
+        resolve(pending, depth - 1, 1, 'float');
+        depth += 1; p += len; prune(); continue;
+      }
+      if (op === 0x95 || op === 0x96) { // fcmpl, fcmpg
+        resolve(pending, depth - 1, 1, 'float');
+        resolve(pending, depth - 2, 1, 'float');
+        depth -= 1; p += len; prune(); continue;
+      }
+      if (op === 0x51) { // fastore: arrayref, index, value(float)
+        resolve(pending, depth - 1, 1, 'float');
+        resolve(pending, depth - 2, 1, 'int');
+        depth -= 3; p += len; prune(); continue;
+      }
+      if (op === 0x38 || (op >= 0x43 && op <= 0x46)) { // fstore, fstore_0..3
+        resolve(pending, depth - 1, 1, 'float');
+        depth -= 1; p += len; prune(); continue;
+      }
+      if (op === 0x63 || op === 0x67 || op === 0x6b || op === 0x6f || op === 0x73) { // dadd, dsub, dmul, ddiv, drem
+        resolve(pending, depth - 2, 2, 'double');
+        resolve(pending, depth - 4, 2, 'double');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x77 || op === 0x8f) { // dneg, d2l
+        resolve(pending, depth - 2, 2, 'double');
+        p += len; prune(); continue;
+      }
+      if (op === 0x8e || op === 0x90) { // d2i, d2f
+        resolve(pending, depth - 2, 2, 'double');
+        depth -= 1; p += len; prune(); continue;
+      }
+      if (op === 0x97 || op === 0x98) { // dcmpl, dcmpg
+        resolve(pending, depth - 2, 2, 'double');
+        resolve(pending, depth - 4, 2, 'double');
+        depth -= 3; p += len; prune(); continue;
+      }
+      if (op === 0xaf) { // dreturn
+        resolve(pending, depth - 2, 2, 'double');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x52) { // dastore
+        resolve(pending, depth - 2, 2, 'double');
+        resolve(pending, depth - 3, 1, 'int');
+        depth -= 4; p += len; prune(); continue;
+      }
+      if (op === 0x39 || (op >= 0x47 && op <= 0x4a)) { // dstore, dstore_0..3
+        resolve(pending, depth - 2, 2, 'double');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x61 || op === 0x65 || op === 0x69 || op === 0x6d || op === 0x71 || op === 0x7e || op === 0x80 || op === 0x82) { // ladd..lxor
+        resolve(pending, depth - 2, 2, 'long');
+        resolve(pending, depth - 4, 2, 'long');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x75 || op === 0x8a) { // lneg, l2d
+        resolve(pending, depth - 2, 2, 'long');
+        p += len; prune(); continue;
+      }
+      if (op === 0x88 || op === 0x89) { // l2i, l2f
+        resolve(pending, depth - 2, 2, 'long');
+        depth -= 1; p += len; prune(); continue;
+      }
+      if (op === 0x94) { // lcmp
+        resolve(pending, depth - 2, 2, 'long');
+        resolve(pending, depth - 4, 2, 'long');
+        depth -= 3; p += len; prune(); continue;
+      }
+      if (op === 0xad) { // lreturn
+        resolve(pending, depth - 2, 2, 'long');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x50) { // lastore
+        resolve(pending, depth - 2, 2, 'long');
+        resolve(pending, depth - 3, 1, 'int');
+        depth -= 4; p += len; prune(); continue;
+      }
+      if (op === 0x37 || (op >= 0x3f && op <= 0x42)) { // lstore, lstore_0..3
+        resolve(pending, depth - 2, 2, 'long');
+        depth -= 2; p += len; prune(); continue;
+      }
+      if (op === 0x85 || op === 0x86 || op === 0x87) { // i2l, i2f, i2d
+        resolve(pending, depth - 1, 1, 'int');
+        depth += op === 0x86 ? 0 : 1; p += len; prune(); continue;
+      }
       if (op === 0xb6 || op === 0xb7 || op === 0xb8 || op === 0xb9 || op === 0xe7) {
         const idx = op === 0xe7 ? bc.readUInt16LE(p + 3) : bc.readUInt16LE(p + 1);
         const desc = refDesc.get(idx);
@@ -429,14 +634,7 @@ export function readMethod(b, mOff) {
 
 function paramSlots(sig, isStatic) {
   let n = isStatic ? 0 : 1;
-  const args = sig.slice(1, sig.indexOf(')'));
-  for (let i = 0; i < args.length; i++) {
-    const ch = args[i];
-    if (ch === 'J' || ch === 'D') n += 2;
-    else if (ch === 'L') { n += 1; i = args.indexOf(';', i); }
-    else if (ch === '[') { while (args[i + 1] === '[') i++; if (args[i + 1] === 'L') i = args.indexOf(';', i); n += 1; }
-    else n += 1;
-  }
+  for (const t of paramTypes(sig)) n += typeWords(t);
   return n;
 }
 
@@ -447,10 +645,34 @@ export function writeClassFile({ className, superName, modifiers, interfaces, fi
   const thisIdx = cp.clazz(className);
   const superIdx = superName ? cp.clazz(superName) : 0;
   const ifaceIdx = interfaces.map((n) => cp.clazz(n));
-  const fd = fields.map((f) => ({ mods: f.modifiers & 0xffff, n: cp.utf8(f.name), d: cp.utf8(f.desc) }));
+  const constName = cp.utf8('ConstantValue');
+  const fd = fields.map((f) => {
+    let constIdx = 0;
+    if (f.constVal && (f.modifiers & 0x0008) !== 0) {
+      if (f.constVal.type === 'String' && f.constVal.cpIdx) constIdx = f.constVal.cpIdx;
+      else if (f.constVal.type === 'int') constIdx = cp.integer(f.constVal.val);
+      else if (f.constVal.type === 'float') constIdx = cp.float(f.constVal.bits);
+      else if (f.constVal.type === 'long') constIdx = cp.long(f.constVal.lo, f.constVal.hi);
+      else if (f.constVal.type === 'double') constIdx = cp.double(f.constVal.lo, f.constVal.hi);
+    }
+    return { mods: f.modifiers & 0xffff, n: cp.utf8(f.name), d: cp.utf8(f.desc), constIdx, constName: constIdx ? constName : 0 };
+  });
   const md = methods.map((m) => {
     const hasCode = m.bytecode && m.bytecode.length > 0;
-    return { mods: m.modifiers & 0xffff, n: cp.utf8(m.name), d: cp.utf8(m.sig), hasCode, codeN: hasCode ? cp.utf8('Code') : 0, m };
+    let thrownIdx = [];
+    if (m.thrownExceptions && m.thrownExceptions.length > 0) {
+      thrownIdx = m.thrownExceptions.map((n) => cp.clazz(n));
+    }
+    return {
+      mods: m.modifiers & 0xffff,
+      n: cp.utf8(m.name),
+      d: cp.utf8(m.sig),
+      hasCode,
+      codeN: hasCode ? cp.utf8('Code') : 0,
+      thrownIdx,
+      exN: thrownIdx.length > 0 ? cp.utf8('Exceptions') : 0,
+      m
+    };
   });
   // Phase 2: serialize the now-complete pool.
   const ser = cp.serialize();
@@ -459,14 +681,44 @@ export function writeClassFile({ className, superName, modifiers, interfaces, fi
   parts.push(u2(modifiers & 0xffff), u2(thisIdx), u2(superIdx), u2(ifaceIdx.length));
   for (const i of ifaceIdx) parts.push(u2(i));
   parts.push(u2(fd.length));
-  for (const f of fd) parts.push(u2(f.mods), u2(f.n), u2(f.d), u2(0));
+  for (const f of fd) {
+    if (f.constIdx) {
+      parts.push(u2(f.mods), u2(f.n), u2(f.d), u2(1));
+      parts.push(u2(f.constName), u4(2), u2(f.constIdx));
+    } else {
+      parts.push(u2(f.mods), u2(f.n), u2(f.d), u2(0));
+    }
+  }
   parts.push(u2(md.length));
   for (const x of md) {
-    parts.push(u2(x.mods), u2(x.n), u2(x.d), u2(x.hasCode ? 1 : 0));
+    const attrCount = (x.hasCode ? 1 : 0) + (x.thrownIdx.length > 0 ? 1 : 0);
+    parts.push(u2(x.mods), u2(x.n), u2(x.d), u2(attrCount));
     if (x.hasCode) {
       const m = x.m;
-      const code = Buffer.concat([u2(m.maxStack), u2(m.maxLocals), u4(m.bytecode.length), m.bytecode, u2(0), u2(0)]);
+      const exParts = [];
+      if (m.exceptions && m.exceptions.length > 0) {
+        exParts.push(u2(m.exceptions.length));
+        for (const e of m.exceptions) {
+          exParts.push(u2(e.startPc), u2(e.endPc), u2(e.handlerPc), u2(e.catchType));
+        }
+      } else {
+        exParts.push(u2(0));
+      }
+      const code = Buffer.concat([
+        u2(m.maxStack),
+        u2(m.maxLocals),
+        u4(m.bytecode.length),
+        m.bytecode,
+        Buffer.concat(exParts),
+        u2(0)
+      ]);
       parts.push(u2(x.codeN), u4(code.length), code);
+    }
+    if (x.thrownIdx.length > 0) {
+      const thParts = [u2(x.thrownIdx.length)];
+      for (const idx of x.thrownIdx) thParts.push(u2(idx));
+      const thBuf = Buffer.concat(thParts);
+      parts.push(u2(x.exN), u4(thBuf.length), thBuf);
     }
   }
   parts.push(u2(0));
@@ -474,27 +726,43 @@ export function writeClassFile({ className, superName, modifiers, interfaces, fi
 }
 
 // Convert one ROM class to a standard .class file. Returns { bytes, info, lines }.
-// Parse the variable-length field table (offset raw[10]+40). Compile-time-constant fields
-// carry extra ConstantValue words; scan to the next valid identifier to skip them.
-// Returns the fields plus the region [start,end) to exclude from CP classification.
+// Parse the field table (offset raw[10]+40). In J9 ROM format, compile-time-constant
+// fields have modifier bit 0x00400000 set and are followed by 1 word (or 2 words for J/D)
+// of ConstantValue data. Returns the fields plus the region [start,end) to exclude from CP classification.
 function parseFields(b, base, raw, methodsOffset) {
   const fields = [];
-  const isFieldName = (s) => !!s && /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(s);
   const start = raw[10] + 40;
   let fpos = base + start;
   const fEnd = base + methodsOffset;
   for (let i = 0; i < raw[9]; i++) {
+    if (fpos + 12 > fEnd) break;
     const name = utf8At(b, selfRel(b, fpos)), desc = utf8At(b, selfRel(b, fpos + 4));
+    const rawMods = u32(b, fpos + 8);
+    const hasConst = (rawMods & 0x00400000) !== 0;
+    const constWords = hasConst ? ((desc === 'J' || desc === 'D') ? 2 : 1) : 0;
+    let constVal = null;
+    if (hasConst) {
+      if (desc === 'Ljava/lang/String;') {
+        constVal = { type: 'String', j9CpIdx: b.readInt32LE(fpos + 12) };
+      } else if (desc === 'J') {
+        constVal = { type: 'long', lo: b.readInt32LE(fpos + 12), hi: b.readInt32LE(fpos + 16) };
+      } else if (desc === 'D') {
+        constVal = { type: 'double', lo: b.readInt32LE(fpos + 12), hi: b.readInt32LE(fpos + 16) };
+      } else if (desc === 'F') {
+        constVal = { type: 'float', bits: b.readUInt32LE(fpos + 12) };
+      } else if ('ZBCSI'.includes(desc)) {
+        constVal = { type: 'int', val: b.readInt32LE(fpos + 12) };
+      }
+    }
     // Mask J9 modifier bits to JVM field access flags; strip 0x1000 (J9 synthetic marker,
     // represented as a Synthetic attribute in standard classes — the flag crashes the JVM
     // field layout builder for patched core classes like java.lang.Void).
     if (name && desc) {
-      let mods = u32(b, fpos + 8) & 0xefff;
+      let mods = rawMods & 0xefff;
       if ((mods & 0x50) === 0x50) mods &= ~0x40; // final+volatile is illegal; J9 volatile bit is a flag
-      fields.push({ name, desc, modifiers: mods });
+      fields.push({ name, desc, modifiers: mods, constVal });
     }
-    fpos += 12;
-    if (i < raw[9] - 1) while (fpos + 4 <= fEnd && !isFieldName(utf8At(b, selfRel(b, fpos)))) fpos += 4;
+    fpos += 12 + constWords * 4;
   }
   return { fields, start, end: fpos - base };
 }
@@ -523,6 +791,7 @@ export function convertClass(b, target, img = parseRomImage(b)) {
   // emitted as InterfaceMethodref. Scanning the opcode usage works even for JDK interfaces
   // (e.g. java/util/Set) that are not present in the firmware ROM.
   const ifaceRefIdx = new Set();
+  const ldc8 = new Set();
   for (let i = 0; i < mStarts.length; i++) {
     const bcWords = b.readUInt16LE(base + mStarts[i] + 14);
     if (bcWords === 0) continue;
@@ -531,6 +800,7 @@ export function convertClass(b, target, img = parseRomImage(b)) {
     const bc = b.subarray(bcStart, Math.min(bcStart + bcWords * 4, bcEnd));
     for (let p = 0; p < bc.length;) {
       const op = bc[p];
+      if (op === 0x12 && p + 1 < bc.length) ldc8.add(bc[p + 1]);
       if (op === 0xe7 && p + 5 <= bc.length) ifaceRefIdx.add(bc.readUInt16LE(p + 3));
       else if (op === 0xb9 && p + 5 <= bc.length) ifaceRefIdx.add(bc.readUInt16LE(p + 1));
       const len = instrLen(bc, p);
@@ -538,9 +808,26 @@ export function convertClass(b, target, img = parseRomImage(b)) {
     }
   }
   if (!img._ifaces) img._ifaces = new Set(img.classes.filter((c) => (c.header.raw[4] & 0x0200) !== 0).map((c) => c.name));
-  const { cp, indexMap } = buildStandardCP(items, ifaceRefIdx, img._ifaces);
+  const { cp, indexMap } = buildStandardCP(items, ifaceRefIdx, img._ifaces, ldc8);
+  for (const f of fields) {
+    if (f.constVal && f.constVal.type === 'String') {
+      const stdIdx = indexMap.get(f.constVal.j9CpIdx);
+      if (stdIdx) f.constVal.cpIdx = stdIdx;
+      else {
+        const cpSlotOff = base + 112 + (f.constVal.j9CpIdx - 1) * 8;
+        const str = utf8At(b, selfRel(b, cpSlotOff));
+        if (str !== null) f.constVal.cpIdx = cp.string(str);
+      }
+    }
+  }
   const refDesc = new Map();
-  items.forEach((it, i) => { if (it.shape === 'Ref') refDesc.set(i + 1, it.natDesc); });
+  items.forEach((it, i) => {
+    if (it.shape === 'Ref') {
+      const cls = items[it.classIndex - 1];
+      const isObject = cls && cls.shape === 'Class' && cls.name === 'java/lang/Object';
+      refDesc.set(i + 1, { natDesc: it.natDesc, natName: it.natName, isObject });
+    }
+  });
   const methods = [];
   for (let i = 0; i < mStarts.length; i++) {
     const m = readMethod(b, base + mStarts[i]);
@@ -554,8 +841,41 @@ export function convertClass(b, target, img = parseRomImage(b)) {
       bytecode = conv.bytecode;
       maxLocals = Math.max(maxLocals, conv.maxLocals);
     }
-    methods.push({ ...m, bytecode, maxLocals });
-    lines.push(`  ${m.name}${m.sig} mods=0x${m.modifiers.toString(16)} stack=${m.maxStack} locals=${maxLocals} bc=${bytecode.length}B`);
+    const exceptions = [];
+    const thrownExceptions = [];
+    if ((m.modifiers & 0x00020000) !== 0) {
+      const exOff = base + mStarts[i] + 20 + m.bcWords * 4;
+      if (exOff + 4 <= b.length && exOff + 4 <= bcEnd) {
+        const catchCount = b.readUInt16LE(exOff);
+        const throwsCount = b.readUInt16LE(exOff + 2);
+        for (let k = 0; k < catchCount; k++) {
+          const eOff = exOff + 4 + k * 16;
+          if (eOff + 16 <= b.length && eOff + 16 <= bcEnd) {
+            const startPc = b.readUInt32LE(eOff);
+            const endPc = b.readUInt32LE(eOff + 4);
+            const handlerPc = b.readUInt32LE(eOff + 8);
+            const j9CatchType = b.readUInt32LE(eOff + 12);
+            let catchType = 0;
+            if (j9CatchType !== 0) {
+              catchType = indexMap.get(j9CatchType) || 0;
+              if (!catchType && items[j9CatchType - 1] && items[j9CatchType - 1].shape === 'Class') {
+                catchType = cp.clazz(items[j9CatchType - 1].name);
+              }
+            }
+            exceptions.push({ startPc, endPc, handlerPc, catchType });
+          }
+        }
+        for (let t = 0; t < throwsCount; t++) {
+          const tOff = exOff + 4 + catchCount * 16 + t * 4;
+          if (tOff + 4 <= b.length && tOff + 4 <= bcEnd) {
+            const className = utf8At(b, selfRel(b, tOff));
+            if (className) thrownExceptions.push(className);
+          }
+        }
+      }
+    }
+    methods.push({ ...m, bytecode, maxLocals, exceptions, thrownExceptions });
+    lines.push(`  ${m.name}${m.sig} mods=0x${m.modifiers.toString(16)} stack=${m.maxStack} locals=${maxLocals} bc=${bytecode.length}B ex=${exceptions.length}`);
   }
   // Interface list: raw[5]=numInterfaces, raw[6] (offset 24) is a self-rel pointer to an
   // array of self-rel pointers to interface class names (verified: MIBMain$1 -> Runnable).

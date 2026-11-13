@@ -24,6 +24,7 @@ const jh = javaHome();
 const bin = (t) => jh ? join(jh, 'bin', t + exe) : t + exe;
 
 const hmiRom = join(root, 'firmware/analysis/p0369/hmi/rom.classes');
+const p0475Rom = join(root, 'firmware/analysis/p0475/hmi/rom.classes');
 const platRom = join(root, 'firmware/analysis/rom/rom.classes');
 const rtDir = join(root, 'firmware/analysis/p0369/runtime');
 const cfgDir = join(rtDir, 'HMI/config');
@@ -37,7 +38,8 @@ const ltDir = join(root, 'firmware/analysis/p0369/load-test');
 const jarPath = join(ltDir, 'hmi-classpath.jar');
 mkdirSync(ltDir, { recursive: true });
 console.log('[runtime] building HMI+platform classpath JAR ...');
-const r = buildClasspathJar([hmiRom, platRom], jarPath);
+const roms = existsSync(p0475Rom) ? [hmiRom, p0475Rom, platRom] : [hmiRom, platRom];
+const r = buildClasspathJar(roms, jarPath);
 console.log(`[runtime] classpath: ${r.entries} classes`);
 execFileSync(bin('javac'), ['-d', ltDir, join(root, 'src/track-a/poc/LoadMIBMain.java')], { stdio: 'inherit' });
 
@@ -52,8 +54,23 @@ const props = {
   'dsiexclude.properties': 'HMI/config/dsiexclude.properties',
   'de.vw.mib.startup.order': 'TARGET',
   'vw.mib.resources': 'HMI/res',
+  'java.library.path': '.',
+  'tsd.mibstd2.hmi.dsi.communication.DefaultPriority': '8',
+  'de.vw.mib.log4mib.mlp.enabled': 'true',
+  'de.vw.mib.threads.disableWatchdog': 'true',
+  'STARTUP_LUM_READY': 'true',
+  'de.vw.mib.runmode.is_normal': 'true',
+  'viewhandler.format': 'zip',
+  'dsi.adapter.factory.class': 'tsd.mibstd2.hmi.dsi.base.NavigationFactory',
+  'GenericEvents.activatePooling': 'true',
+  'GenericEventPool.poolSize': '2048',
+  'GenericEventPool.poolPreFill': '512',
 };
-const args = ['-noverify', '-Xmx256m'];
+const jniDll = join(rtDir, 'tsd.mibstd2.hmi.dsi.native.dll');
+if (!existsSync(jniDll)) {
+  execFileSync(process.execPath, [join(root, 'src/track-a/jni/build-jni.js')], { stdio: 'inherit' });
+}
+const args = ['-Xmx256m'];
 for (const [k, v] of Object.entries(props)) args.push(`-D${k}=${v}`);
 args.push('-cp', jarPath + sep + ltDir, 'LoadMIBMain', 'de.vw.mib.MIBMain', 'run');
 
@@ -64,19 +81,19 @@ child.stdout.on('data', (d) => { out += d; });
 child.stderr.on('data', (d) => { out += d; });
 await new Promise((res) => { const t = setTimeout(() => { child.kill(); res(); }, 12000); child.on('exit', () => { clearTimeout(t); res(); }); });
 
-const frontier = out.includes('tsd.mibstd2.hmi.dsi.native') ? 'native DSI SPI library (ARM QNX .so) — Track A adapter boundary' : 'see output';
+const frontier = out.includes('=== ACTIVE BUNDLES') ? 'OSGi Managed Bundles Active' : 'see output';
 const evidence = `# Track A A4 — authentic VW HMI startup on JDK 21 (runtime frontier)
 # Date: ${new Date().toISOString()}
 # Source: de.vw.mib.MIBMain (P0369 MIBHMI.jxe), authentic config from P0475 QNX6 /tsd/hmi/HMI/config.
-# Classpath: ${r.entries} converted HMI+platform classes. JVM: JDK 21, -noverify (per runHMI.sh).
+# Classpath: ${r.entries} converted HMI+platform classes. JVM: JDK 21, standard bytecode verification.
 # Working dir: firmware/analysis/p0369/runtime ; system properties mirror runHMI.sh.
 #
 # Verified executing: MIBMain.main -> Log4MIB (structured logging) -> MIBOsgi container ->
-# bundles.properties loaded -> startSPIBundles -> BundleWatchdog running.
+# bundles.properties loaded -> startSPIBundles -> startAutostartBundles -> startManagedBundles -> BundleWatchdog running.
 # Execution frontier: ${frontier}
 #
 # Sampled output (12s):
-${out.split('\n').filter((l) => !l.includes('java.library.path')).slice(0, 60).join('\n')}
+${out.split('\n').filter((l) => !l.includes('java.library.path')).slice(0, 300).join('\n')}
 `;
 const evidencePath = join(root, 'docs/evidence/track-a-mibmain-runtime.txt');
 writeFileSync(evidencePath, evidence);

@@ -1,5 +1,5 @@
 # Track A A3 — authentic VW HMI code behavioral execution on JDK 21
-# Date: 2026-11-13T09:05:10.031Z
+# Date: 2026-11-13T13:44:50.821Z
 # Source: de.vw.extlibs.collections.ints.IntObjectOptHashMap from P0369 platform JXE
 #         (tsd.mibstd2.hmi.v2.jxe / rom.classes), converted by independent ROM->.class converter
 # Platform JAR: F:\vw-mib2-emulator\firmware\analysis\platform.jar

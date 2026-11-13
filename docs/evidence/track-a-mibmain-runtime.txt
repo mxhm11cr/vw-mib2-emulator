@@ -1,15 +1,14 @@
 # Track A A4 — authentic VW HMI startup on JDK 21 (runtime frontier)
-# Date: 2026-11-13T11:32:47.513Z
+# Date: 2026-11-13T13:43:22.698Z
 # Source: de.vw.mib.MIBMain (P0369 MIBHMI.jxe), authentic config from P0475 QNX6 /tsd/hmi/HMI/config.
-# Classpath: 18511 converted HMI+platform classes. JVM: JDK 21, -noverify (per runHMI.sh).
+# Classpath: 22020 converted HMI+platform classes. JVM: JDK 21, standard bytecode verification.
 # Working dir: firmware/analysis/p0369/runtime ; system properties mirror runHMI.sh.
 #
 # Verified executing: MIBMain.main -> Log4MIB (structured logging) -> MIBOsgi container ->
-# bundles.properties loaded -> startSPIBundles -> BundleWatchdog running.
-# Execution frontier: native DSI SPI library (ARM QNX .so) — Track A adapter boundary
+# bundles.properties loaded -> startSPIBundles -> startAutostartBundles -> startManagedBundles -> BundleWatchdog running.
+# Execution frontier: OSGi Managed Bundles Active
 #
 # Sampled output (12s):
-Java HotSpot(TM) 64-Bit Server VM warning: Options -Xverify:none and -noverify were deprecated in JDK 13 and will likely be removed in a future release.
 LOADED: de.vw.mib.MIBMain
 super: java.lang.Object
 interfaces: [interface de.vw.mib.log4mib.classifier.StartupClassifier]
@@ -20,20 +19,107 @@ main method resolved: public static void de.vw.mib.MIBMain.main(java.lang.String
 invoking main() ...
 main() returned
 [Log4MIB] Initializing Log4MIB - queue capacity: 2000
-[Log4MIB] logging thread started - 157988581
-6   INFO [0x4000, 0x1, 0xf272cf50] Launching MIB ...
-8   INFO [0x4000, 0x1, 0xf272cf50] Starting HMI with startup order: TARGET
-10   INFO [0x4000, 0x2, 0xf272cf50] Starting SPI bundles ...
-	at java.base/java.lang.ClassLoader.loadLibrary(ClassLoader.java:2458)
-	at java.base/java.lang.Runtime.loadLibrary0(Runtime.java:916)
-	at java.base/java.lang.System.loadLibrary(System.java:2064)
-	at tsd.mibstd2.hmi.spi.NativeSPILibraryLoader.load(Unknown Source)
-	at tsd.mibstd2.hmi.spi.DefaultSPIActivator.start(Unknown Source)
-	at de.vw.mib.osgi.internal.BundleInfo.start(Unknown Source)
-	at de.vw.mib.osgi.internal.MIBOsgiImpl.startBundle(Unknown Source)
-	at de.vw.mib.osgi.internal.MIBOsgiImpl.performBundleStarts(Unknown Source)
-	at de.vw.mib.osgi.internal.MIBOsgiImpl.startSPIBundles(Unknown Source)
-	at de.vw.mib.MIBMain.start(Unknown Source)
-	at de.vw.mib.MIBMain$1.run(Unknown Source)
-	at java.base/java.lang.Thread.run(Thread.java:1583)
+[Log4MIB] logging thread started - 1272449141
+7   INFO [0x4000, 0x1, 0xf272cf50] Launching MIB ...
+10   INFO [0x4000, 0x1, 0xf272cf50] Starting HMI with startup order: TARGET
+12   INFO [0x4000, 0x2, 0xf272cf50] Starting SPI bundles ...
+27   INFO [0x4000, 0x2, 0xf272cf50] Starting autostart bundles ...
+256097360471900 - [Log4MIB-Heartbeat] heartbeat started - frequency: 30000ms, first heartbeat after 10000ms
+256097360218000   INFO [0x200, 0x4, 0xf272cf50] Using new TimestampProvider by now to create logging timestamps!
+256097389276700   INFO [0x200, 0x2, 0xf272cf50] hmisoftware.version:=H28.28.208_STD2Nav_EU;;hmisoftware.base.version:=H28.28.208-201808311211;;protocol.version:=1.2;;logmessage.count:=24/0;;logmessage.data.size:=2KB;;logmessage.queue.size:=1/2000
+256097401711800  ERROR [0x2, 0x4, 0xf272cf50] [DebugProbeManager] No directory set for debug probe configuration files!
+256097401721200  ERROR [0x2, 0x4, 0xf272cf50] [DebugProbeManager] Please set system property 'debugprobes.config.path'!
+256097401731000  ERROR [0x2, 0x4, 0xf272cf50] [DebugProbeManager] All debug probes keep deactivated!
+256097465723400   INFO [0x4000, 0x2, 0xf272cf50] Starting managed bundles ...
+256097480960600   INFO [0x800001, 0x2, 0xf272cf50] [ASLList] Activator started.
+256097483062900   INFO [0x800001, 0x1, 0xf272cf50] [ASL-Framework] Activator started.
+256097606781000   INFO [0x1, 0x1, 0xe6c15f22] [ASLStartup v8]skipping DSI: org.dsi.ifc.upnp.DSIUPNPPlayer ,instance 0 because FeatureFlag was not set
+256097606817700   INFO [0x1, 0x1, 0xe6c15f22] [ASLStartup v8]skipping DSI: org.dsi.ifc.upnp.DSIUPNPBrowser ,instance 0 because FeatureFlag was not set
+256097606854000   INFO [0x1, 0x1, 0xe6c15f22] [ASLStartup v8]skipping DSI: org.dsi.ifc.komonavinfo.DSIKOMONavInfo ,instance 0 because FeatureFlag was not set
+256097606887400   INFO [0x1, 0x1, 0xe6c15f22] [ASLStartup v8]skipping DSI: org.dsi.ifc.online.DSIOperatorCall ,instance 0 because FeatureFlag was not set
+256097606957400   INFO [0x1, 0x1, 0xe6c15f22] [DsiInformationService] Information about available DSI processed.
+256097606995500   INFO [0x1, 0x1, 0xe6c15f22] [PersistenceInformationService] Information about available persistence namespaces processed.
+256097660053000  ERROR [0x800001, 0x8, 0xe6c15f22] [DSIProxy] Could not load module reflection configuration for package de.vw.mib.asl.framework.internal.entertainmentmanager.reflection.generated
+256097666674000   INFO [0x8, 0x800, 0xf272cf50] Loading display size dependent translations. Language tag: de_DE-0
+256097700487600   INFO [0x400, 0x1, 0xf272cf50] Instatiating class loader: loading JXEs from viewhandler.zip
+256097705859600   INFO [0x3, 0x4, 0xf272cf50] [CIO Visualization] CioVisualizationServiceDispatcher wants to load, but no apps registered yet. 
+=== OSGi BUNDLE STATUS (8s) ===
+  Bundle 1: [ACTIVE]
+  Bundle 2: [ACTIVE]
+  Bundle 3: [ACTIVE]
+  Bundle 4: [ACTIVE]
+  Bundle 5: [ACTIVE]
+  Bundle 6: [ACTIVE]
+  Bundle 7: [ACTIVE]
+  Bundle 8: [STATE_1]
+  Bundle 9: [STATE_1]
+  Bundle 10: [ACTIVE]
+  Bundle 11: [ACTIVE]
+  Bundle 12: [ACTIVE]
+  Bundle 13: [ACTIVE]
+  Bundle 14: [ACTIVE]
+  Bundle 15: [ACTIVE]
+  Bundle 16: [ACTIVE]
+  Bundle 17: [ACTIVE]
+  Bundle 18: [ACTIVE]
+  Bundle 19: [ACTIVE]
+  Bundle 20: [ACTIVE]
+  Bundle 21: [ACTIVE]
+  Bundle 22: [ACTIVE]
+  Bundle 23: [ACTIVE]
+  Bundle 24: [ACTIVE]
+  Bundle 25: [ACTIVE]
+  Bundle 26: [ACTIVE]
+  Bundle 27: [STATE_1]
+  Bundle 28: [STATE_1]
+  Bundle 29: [STATE_1]
+  Bundle 30: [ACTIVE]
+  Bundle 31: [ACTIVE]
+  Bundle 32: [ACTIVE]
+  Bundle 33: [ACTIVE]
+  Bundle 34: [ACTIVE]
+  Bundle 35: [ACTIVE]
+  Bundle 36: [ACTIVE]
+  Bundle 37: [ACTIVE]
+  Bundle 38: [ACTIVE]
+  Bundle 39: [STATE_1]
+  Bundle 40: [ACTIVE]
+  Bundle 41: [ACTIVE]
+  Bundle 42: [ACTIVE]
+  Bundle 43: [ACTIVE]
+  Bundle 44: [ACTIVE]
+  Bundle 45: [ACTIVE]
+  Bundle 46: [ACTIVE]
+  Bundle 47: [ACTIVE]
+  Bundle 48: [ACTIVE]
+  Bundle 49: [STATE_1]
+  Bundle 50: [STATE_1]
+  Bundle 51: [STATE_1]
+  Bundle 52: [STATE_1]
+  Bundle 53: [STATE_1]
+  Bundle 54: [STATE_1]
+  Bundle 55: [STATE_1]
+  Bundle 56: [STATE_1]
+  Bundle 57: [STATE_1]
+  Bundle 58: [STATE_1]
+  Bundle 59: [STATE_1]
+  Bundle 60: [ACTIVE]
+  Bundle 61: [RESOLVED]
+  Bundle 62: [RESOLVED]
+  Bundle 63: [ACTIVE]
+  Bundle 64: [STATE_1]
+  Bundle 65: [STATE_1]
+  Bundle 66: [STATE_1]
+  Bundle 67: [STATE_1]
+  Bundle 68: [STATE_1]
+  Bundle 69: [STATE_1]
+  Bundle 70: [RESOLVED]
+  Bundle 71: [RESOLVED]
+  Bundle 72: [ACTIVE]
+  Bundle 73: [RESOLVED]
+  Bundle 74: [ACTIVE]
+  Bundle 75: [RESOLVED]
+  Bundle 76: [ACTIVE]
+=== ACTIVE BUNDLES: 47/76 ===
+256107371662800   INFO [0x200, 0x2, 0x469c13ce] skin.short.version:=VW_STD_Skin_A-STD2Nav_EU-2;;hmisoftware.version:=H28.28.208_STD2Nav_EU;;hmisoftware.base.version:=H28.28.208-201808311211;;protocol.version:=1.2;;logmessage.count:=74/0;;logmessage.data.size:=12KB;;generic.event.queue.size:=2;;logmessage.queue.size:=3/2000;;generic.event.count:=8;;active.debug.probes:=NONE
 

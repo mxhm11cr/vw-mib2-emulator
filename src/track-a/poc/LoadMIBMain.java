@@ -41,6 +41,29 @@ public class LoadMIBMain {
             }
         }
         if (args.length > 1 && args[1].equals("run")) {
+            new Thread(() -> {
+                try {
+                    Thread.sleep(8000);
+                    Class<?> osgiCls = Class.forName("de.vw.mib.osgi.MIBOsgi", false, cl);
+                    Object osgi = osgiCls.getMethod("getInstance").invoke(null);
+                    java.lang.reflect.Method getBundleState = osgiCls.getMethod("getBundleState", int.class);
+                    System.out.println("=== OSGi BUNDLE STATUS (8s) ===");
+                    int active = 0, total = 0;
+                    for (int id = 1; id <= 76; id++) {
+                        int state = (Integer) getBundleState.invoke(osgi, id);
+                        if (state != 0) {
+                            total++;
+                            String stateStr = state == 32 ? "ACTIVE" : state == 8 ? "STARTING" : state == 4 ? "RESOLVED" : state == 2 ? "INSTALLED" : ("STATE_" + state);
+                            if (state == 32) active++;
+                            System.out.println("  Bundle " + id + ": [" + stateStr + "]");
+                        }
+                    }
+                    System.out.println("=== ACTIVE BUNDLES: " + active + "/" + total + " ===");
+                } catch (Throwable t) {
+                    System.out.println("Bundle status monitor error: " + t);
+                }
+            }, "OSGi-Status-Monitor").start();
+
             try {
                 Class.forName(name, true, cl);
                 java.lang.reflect.Method m = c.getDeclaredMethod("main", String[].class);
