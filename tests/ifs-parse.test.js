@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   parseStartupHeader, validateStartupHeader, findStartupHeaders, findImagefs,
   STARTUP_HDR_SIGNATURE,
@@ -49,8 +49,10 @@ test('validator rejects bad machine / version / signature', () => {
   assert.equal(validateStartupHeader(parseStartupHeader(bad3, 0)).signature, false);
 });
 
-test('authentic P0369 firmware: valid startup header establishes entry reliably', () => {
-  const buf = readFileSync('firmware/extracted/P0369/cpu/cpuimage_sec_stdNavi/33/default/mibstd2_cpu.boot');
+const firmwarePath = 'firmware/extracted/P0369/cpu/cpuimage_sec_stdNavi/33/default/mibstd2_cpu.boot';
+
+(existsSync(firmwarePath) ? test : test.skip)('authentic P0369 firmware: valid startup header establishes entry reliably', () => {
+  const buf = readFileSync(firmwarePath);
   const hs = findStartupHeaders(buf);
   const valid = hs.filter((h) => validateStartupHeader(h).valid);
   assert.equal(valid.length, 1, 'exactly one valid startup header');
