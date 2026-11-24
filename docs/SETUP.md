@@ -16,7 +16,26 @@ The launcher expects this layout relative to the clone. Preparation is manual an
 | `firmware/analysis/p0369/runtime/Resources/` | Firmware skin resources, including the converted skin 1 view handler |
 | `firmware/analysis/p0369/runtime/libEGL.dll` and `libGLESv2.dll` | Matching x64 ANGLE runtime binaries |
 
-The repository contains an [IFS extraction tool](../tools/ifs-extract.js) and a [view handler converter](../src/track-a/jxe/build-viewhandler-jar.js). The launcher builds its classpath JAR if it is missing. A prepared P0475 HMI ROM at `firmware/analysis/p0475/hmi/rom.classes` is used as an optional supplemental input.
+With 7-Zip on your path, you can unpack the two ROMs and assemble the resource directories after extracting the HMI tarball into `firmware/analysis/hmizr/`.
+
+```powershell
+$analysis = 'firmware/analysis'
+$hmi = "$analysis/hmizr/tsd/tmp/hmi"
+$runtime = "$analysis/p0369/runtime"
+New-Item -ItemType Directory -Force "$analysis/rom", "$analysis/p0369/hmi", $runtime | Out-Null
+
+7z x -tzip "$hmi/tsd.mibstd2.hmi.v2.jxe" "-o$analysis/rom" rom.classes
+node tools/ifs-extract.js "$hmi/tsd.mibstd2.hmi.ifs" MIBHMI.jxe "$analysis/p0369/hmi/MIBHMI.jxe"
+7z x -tzip "$analysis/p0369/hmi/MIBHMI.jxe" "-o$analysis/p0369/hmi" rom.classes
+
+Copy-Item "$hmi/HMI", "$hmi/Resources" -Destination $runtime -Recurse
+$skin = "$runtime/Resources/skin1"
+node src/track-a/jxe/build-viewhandler-jar.js "$skin/viewhandler.zip" "$skin/viewhandler.jar"
+node tools/build-skin-cache.cjs "$runtime/Resources/skin0/images.mcf" "$runtime/skin0_cache.bin"
+node tools/build-skin-cache.cjs "$skin/images.mcf" "$runtime/skin1_cache.bin" --expand-alpha
+```
+
+The launcher builds its classpath JAR if it is missing. A prepared P0475 HMI ROM at `firmware/analysis/p0475/hmi/rom.classes` is used as an optional supplemental input.
 
 ## 2. Build the adapters
 
