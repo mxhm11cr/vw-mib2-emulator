@@ -78,7 +78,7 @@ placeholder filled during flashing, not code.
 Parse the QNX IFS header in `mibstd2_cpu.boot` to locate the authentic entry point, then
 attempt execution on QEMU i.MX6 (`sabrelite`) / Cortex-A9 with instruction tracing, capturing
 registers/trace/console as evidence. Parsing/loading is NOT execution; a generic Linux/QNX
-boot is NOT a VW boot. See PROGRESS.md and docs/P0369_BOOT_REPORT.md.
+boot is NOT a VW boot. See the [progress log](PROGRESS.md) and [QNX boot report](P0369_BOOT_REPORT.md).
 
 ## 9. imagefs contents — authentic OS components confirmed (read-only)
 The QNX imagefs (signature `imagefs` @ file 0x12C10; image_size 0x900DF0, dir_offset 0x5C)

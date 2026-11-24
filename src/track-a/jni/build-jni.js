@@ -3,19 +3,29 @@
 // 2. swap.dll (MicroDoc ObjectSwapper binary resource deserializer)
 // 3. tsd.opengl.jsr231.native.dll (TechniSat / VW OpenGL stack via Google ANGLE)
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, copyFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { existsSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve('F:/vw-mib2-emulator');
+const root = fileURLToPath(new URL('../../../', import.meta.url));
 const outDir = join(root, 'firmware/analysis/p0369/runtime');
 
-const cl = 'C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.50.35717/bin/Hostx64/x64/cl.exe';
-const jdk = 'C:/Program Files/Java/jdk-21.0.12.1';
+const localCl = 'C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.50.35717/bin/Hostx64/x64/cl.exe';
+const jdk = process.env.JAVA_HOME || 'C:/Program Files/Java/jdk-21.0.12.1';
+const useDeveloperShell = Boolean(process.env.VCToolsInstallDir);
+const cl = useDeveloperShell ? 'cl.exe' : localCl;
 const msvcInc = 'C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.50.35717/include';
 const sdkInc = 'C:/Program Files (x86)/Windows Kits/10/Include/10.0.26100.0';
 
 const msvcLib = 'C:/Program Files (x86)/Microsoft Visual Studio/18/BuildTools/VC/Tools/MSVC/14.50.35717/lib/x64';
 const sdkLib = 'C:/Program Files (x86)/Windows Kits/10/Lib/10.0.26100.0';
+
+if (!existsSync(join(jdk, 'include', 'jni.h'))) {
+  throw new Error('Set JAVA_HOME to your JDK 21 installation.');
+}
+if (!useDeveloperShell && !existsSync(localCl)) {
+  throw new Error('Run this command from the x64 Native Tools prompt for Visual Studio.');
+}
 
 mkdirSync(outDir, { recursive: true });
 
@@ -28,18 +38,23 @@ function compileDll(srcName, dllName) {
     '/W3',
     `/I${join(jdk, 'include')}`,
     `/I${join(jdk, 'include/win32')}`,
-    `/I${msvcInc}`,
-    `/I${join(sdkInc, 'ucrt')}`,
-    `/I${join(sdkInc, 'shared')}`,
-    `/I${join(sdkInc, 'um')}`,
+    ...(!useDeveloperShell ? [
+      `/I${msvcInc}`,
+      `/I${join(sdkInc, 'ucrt')}`,
+      `/I${join(sdkInc, 'shared')}`,
+      `/I${join(sdkInc, 'um')}`,
+    ] : []),
     src,
     `/Fe:${outDll}`,
     '/link',
-    `/LIBPATH:${msvcLib}`,
-    `/LIBPATH:${join(sdkLib, 'ucrt/x64')}`,
-    `/LIBPATH:${join(sdkLib, 'um/x64')}`,
+    ...(!useDeveloperShell ? [
+      `/LIBPATH:${msvcLib}`,
+      `/LIBPATH:${join(sdkLib, 'ucrt/x64')}`,
+      `/LIBPATH:${join(sdkLib, 'um/x64')}`,
+    ] : []),
     'kernel32.lib',
     'user32.lib',
+    'gdi32.lib',
   ];
   console.log(`[build-jni] Compiling ${srcName} -> ${dllName}`);
   execFileSync(cl, args, { stdio: 'inherit', cwd: outDir });

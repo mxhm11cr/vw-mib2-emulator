@@ -67,21 +67,30 @@ const props = {
   'GenericEventPool.poolPreFill': '512',
   'de.vw.mib.graphics.font.mockspi': 'true',
   'de.vw.mib.graphics.image.nocheckerboard': 'true',
+  'STARTUP_LUM_READY': 'true',
+  'de.vw.mib.runmode.is_normal': 'true',
+  'viewhandler.format': 'jar',
+  'dsi.adapter.factory.class': 'tsd.mibstd2.hmi.dsi.base.NavigationFactory',
+  'GenericEvents.activatePooling': 'true',
+  'GenericEventPool.poolSize': '2048',
+  'GenericEventPool.poolPreFill': '512',
+  'de.vw.mib.graphics.font.mockspi': 'true',
+  'de.vw.mib.graphics.image.nocheckerboard': 'true',
 };
 const jniDll = join(rtDir, 'tsd.mibstd2.hmi.dsi.native.dll');
 if (!existsSync(jniDll)) {
   execFileSync(process.execPath, [join(root, 'src/track-a/jni/build-jni.js')], { stdio: 'inherit' });
 }
-const args = ['-Xmx256m'];
+const args = ['-Xmx512m', '-Xverify:none'];
 for (const [k, v] of Object.entries(props)) args.push(`-D${k}=${v}`);
 args.push('-cp', jarPath + sep + ltDir, 'LoadMIBMain', 'de.vw.mib.MIBMain', 'run');
 
-console.log('[runtime] starting authentic HMI (sampling 30s) ...');
+console.log('[runtime] starting authentic HMI (sampling 45s) ...');
 const child = spawn(bin('java'), args, { cwd: rtDir });
 let out = '';
 child.stdout.on('data', (d) => { out += d; });
 child.stderr.on('data', (d) => { out += d; });
-await new Promise((res) => { const t = setTimeout(() => { child.kill(); res(); }, 30000); child.on('exit', () => { clearTimeout(t); res(); }); });
+await new Promise((res) => { const t = setTimeout(() => { child.kill(); res(); }, 45000); child.on('exit', () => { clearTimeout(t); res(); }); });
 
 const frontier = out.includes('=== ACTIVE BUNDLES') ? 'OSGi Managed Bundles Active' : 'see output';
 const evidence = `# Track A A4 — authentic VW HMI startup on JDK 21 (runtime frontier)

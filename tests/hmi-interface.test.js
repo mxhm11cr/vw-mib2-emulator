@@ -85,3 +85,12 @@ function cpTagCount(bytes, wantTag) {
   const m1 = lines.find((l) => l.includes('getValueAsString(I)'));
   assert.ok(m1, 'getValueAsString(I) must convert cleanly');
 });
+
+(haveRom ? test : test.skip)('speller control character strings (\\x07) preserved in EUMatchTextSubject', () => {
+  const b = readFileSync(romPath);
+  const img = parseRomImage(b);
+  const { lines, bytes } = convertClass(b, 'de/vw/mib/asl/internal/navigation/spellerx/subjects/EUMatchTextSubject', img);
+  const m = lines.find((l) => l.includes('updateSpellerWithAllCharactersAvailable'));
+  assert.ok(m, 'updateSpellerWithAllCharactersAvailable method must exist');
+  assert.ok(bytes.includes(Buffer.from([1, 0, 1, 7])), 'expected \\x07 utf8 string in classfile');
+});

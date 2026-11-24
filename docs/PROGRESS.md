@@ -1,5 +1,7 @@
 # PROGRESS — VW MIB2 real firmware (P0369)
 
+This log records early milestones. See the [project README](../README.md) for current HMI status.
+
 Target (firmware-verified): **TechniSat MIB2 Standard ZR — NXP i.MX6 (Cortex-A9, ARMv7-A 32-bit),
 QNX Neutrino 6.5.0 SMP.** Firmware: `MST2_EU_VW_ZR_P0369T_3G0919360LN.7z`.
 

@@ -1,17 +1,30 @@
-tools/qemu/
-firmware/analysis/
-firmware/extracted/
-firmware/reference/vmlinuz
-firmware/reference/initrd.gz
-firmware/reference/*.dtb
-firmware/reference/*.log
-firmware/research/*.pdf
-firmware/research/*.txt
-node_modules/
+# Local firmware inputs and derived runtime
+/firmware/
+/linux-arm64-dist/
+/tools/qemu/
+/zig/
+
+# Local research and developer tools
+/.local/
+/.qwen/
+/node_modules/
+.env
+.env.*
+!*.env.example
+
+# Local archives and native/Java build outputs
+/*.zip
 *.exe
-firmware/*.7z
-firmware/*.part
-firmware/*.img
-firmware/MST2_EU_VW_PQ_P0475T_IMG_CP_OFF_SWAP/
-test-output.log
-.qwen/
+*.dll
+*.so
+*.dylib
+*.obj
+*.class
+*.jar
+*.exp
+*.lib
+*.pdb
+*.log
+
+# Historical benchmark log checked into docs
+!/docs/evidence/mib2-reference-boot.log

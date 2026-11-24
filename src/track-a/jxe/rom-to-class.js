@@ -41,7 +41,7 @@ export function parseCP(b, classOff, cpStartRel, cpEndRel, fieldStart = -1, fiel
         const len = b.readUInt16LE(tgt);
         if (len <= 4096 && tgt + 2 + len <= b.length) nm = b.toString('latin1', tgt + 2, tgt + 2 + len);
       }
-      if (nm !== null && !/[\x00\x03-\x08\x0b\x0c\x0e-\x1f]/.test(nm)) items.push({ shape: 'String', name: nm, off });
+      if (nm !== null && !/\x00/.test(nm)) items.push({ shape: 'String', name: nm, off });
       else items.push({ shape: 'Unknown', s1, s2, off });
     }
     else if (s1 > 0 && s1 < 4096) {
@@ -469,7 +469,17 @@ function scanConstKinds(b, base, mStarts, romSize, items) {
   items.forEach((it, i) => { if (it.shape === 'Ref') refDesc.set(i + 1, it.natDesc); });
   const resolve = (pending, valueDepth, words, kind) => {
     if (!kind) return;
-    for (const e of pending) if (e.depth === valueDepth && e.words === words) { kinds.set(e.idx, kind); return; }
+    for (let i = 0; i < pending.length; i++) {
+      const e = pending[i];
+      if (e.depth === valueDepth && e.words === words) {
+        const existing = kinds.get(e.idx);
+        if (existing !== 'float' && existing !== 'double') {
+          kinds.set(e.idx, kind);
+        }
+        pending.splice(i, 1);
+        return;
+      }
+    }
   };
   for (let mi = 0; mi < mStarts.length; mi++) {
     const words = (u32(b, base + mStarts[mi] + 12) >>> 16) & 0xffff;
