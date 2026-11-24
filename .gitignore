@@ -6,7 +6,6 @@
 
 # Local research and developer tools
 /.local/
-/.qwen/
 /node_modules/
 .env
 .env.*

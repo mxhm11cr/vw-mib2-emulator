@@ -2,9 +2,15 @@
 
 Run the original Java infotainment interface from a Volkswagen Golf Mk7 MIB2 Standard on a Windows PC. The project loads firmware **P0369** on JDK 21 and provides host adapters for graphics, input and simulated vehicle data.
 
-[Open the interactive preview](https://mxhm11cr.github.io/vw-mib2-emulator/) · [Screen captures](docs/SCREENSHOTS.md) · [Windows setup](docs/SETUP.md) · [QNX boot research](docs/P0369_BOOT_REPORT.md)
+[Windows setup](docs/SETUP.md) · [QNX boot research](docs/P0369_BOOT_REPORT.md)
 
-![MIB2 Performance Monitor rendered by the emulator, with three circular gauges](docs/assets/performance.png)
+## Screenshots
+
+| Performance monitor | FM radio |
+| --- | --- |
+| ![Three circular performance gauges](docs/assets/performance.png) | ![FM radio and station presets](docs/assets/radio.png) |
+| **Vehicle status** | **Think Blue. Trainer.** |
+| ![Vehicle status with a Golf Mk7 render](docs/assets/vehicle.png) | ![Three blue driving efficiency indicators](docs/assets/efficiency.png) |
 
 ## What works
 
