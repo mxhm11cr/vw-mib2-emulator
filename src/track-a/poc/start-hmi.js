@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildClasspathJar } from '../jxe/build-hmi-classpath.js';
+import { findFirmwareArchive, prepareFirmware } from '../../../tools/prepare-firmware.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const exe = process.platform === 'win32' ? '.exe' : '';
@@ -26,10 +27,28 @@ const p0475Rom = join(root, 'firmware/analysis/p0475/hmi/rom.classes');
 const platRom = join(root, 'firmware/analysis/rom/rom.classes');
 const rtDir = join(root, 'firmware/analysis/p0369/runtime');
 
-if (!existsSync(hmiRom) || !existsSync(platRom)) {
-  console.error('[start-hmi] Missing local firmware ROMs. See docs/SETUP.md.');
-  console.error(`  ${hmiRom}\n  ${platRom}`);
+try {
+  const needsFirmware = !existsSync(hmiRom) || !existsSync(platRom);
+  const archive = process.argv[2] || (needsFirmware ? findFirmwareArchive(root) : undefined);
+  if (archive) await prepareFirmware(root, archive);
+} catch (error) {
+  console.error(`[start-hmi] ${error.message}`);
   process.exit(1);
+}
+
+if (!existsSync(hmiRom) || !existsSync(platRom)) {
+  console.error('[start-hmi] Add the stock P0369 firmware archive beside run-vw-mib2.bat, or drag the archive onto it.');
+  console.error('[start-hmi] See docs/SETUP.md for the supported files and Windows dependencies.');
+  process.exit(1);
+}
+
+if (process.platform === 'win32') {
+  const libraries = ['libEGL.dll', 'libGLESv2.dll', 'swap.dll', 'tsd.mibstd2.hmi.dsi.native.dll', 'tsd.opengl.jsr231.native.dll'];
+  const missing = libraries.filter(name => !existsSync(join(rtDir, name)));
+  if (missing.length) {
+    console.error(`[start-hmi] Missing Windows DLLs: ${missing.join(', ')}. See docs/SETUP.md.`);
+    process.exit(1);
+  }
 }
 
 const ltDir = join(root, 'firmware/analysis/p0369/load-test');

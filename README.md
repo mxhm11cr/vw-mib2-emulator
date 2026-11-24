@@ -22,11 +22,7 @@ The desktop HMI and full-system emulation are separate milestones. QEMU executes
 
 ## Run locally
 
-Use **Windows x64**, **Node.js 20+**, **JDK 21** and your own P0369 firmware. Prepare the runtime files and native adapters as described in the [setup guide](docs/SETUP.md), then start the emulator.
-
-```powershell
-npm start
-```
+Use **Windows x64**, **Node.js 22.2+**, and **JDK 21**. Follow the [Windows setup guide](docs/SETUP.md) for the native DLLs. Drop the stock P0369 archive or its smaller HMI tarball onto `run-vw-mib2.bat` to import the required files and start the emulator. After the first import, double-click the batch file to launch it again.
 
 Use **R** for Radio, **E** for Media, **C** for CAR and **M** for Menu. The local dashboard listens on port **8080**. Run `npm test` for the parser and JVM converter tests. Tests that require firmware fixtures skip when those files are absent.
 

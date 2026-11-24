@@ -6,6 +6,7 @@
   "description": "Experimental Volkswagen Golf Mk7 MIB2 Standard Java HMI runtime and QNX boot research.",
   "scripts": {
     "start": "node src/track-a/poc/start-hmi.js",
+    "setup:firmware": "node tools/prepare-firmware.js",
     "track-a:start": "node src/track-a/poc/start-hmi.js",
     "test": "node --test \"tests/*.test.js\"",
     "inspect": "node tools/inspect-firmware.js",
@@ -20,6 +21,6 @@
     "track-a:jni": "node src/track-a/jni/build-jni.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.2"
   }
 }
